@@ -1,5 +1,5 @@
-import { Pause, Play } from 'lucide'
-import { Container, Graphics } from 'pixi.js'
+import { Flame, Pause, Play, Trophy } from 'lucide'
+import { Container, Graphics, Sprite, Texture } from 'pixi.js'
 import type { Camara } from './camara'
 import { boton, el, formatear } from './herramienta'
 import type { Plan } from './plan'
@@ -13,6 +13,34 @@ const VELOCIDADES = [1, 2, 5, 10]
 const RADIO = 0.32 // m: una persona vista desde arriba, algo exagerada para que se vea
 const RADIO_MIN_PX = 3 // de lejos, que no desaparezcan
 const MAX_POR_FOTOGRAMA = 20 // s de simulación como mucho por fotograma, para no congelar la pantalla
+
+/** Calor: de coral claro casi transparente (poco) a rojo intenso (mucho). Un solo tono, que no se confunde con las secciones. */
+const CALOR_BAJO = [0xf4, 0x9a, 0x96]
+const CALOR_ALTO = [0xc4, 0x26, 0x30]
+
+/** Difuminado por cajas (separable), en el sitio: dos pasadas se parecen a un difuminado gaussiano. */
+function difuminar(v: Float32Array, ancho: number, alto: number, radio: number) {
+  const tmp = new Float32Array(v.length)
+  const n = 2 * radio + 1
+  for (let y = 0; y < alto; y++)
+    for (let x = 0; x < ancho; x++) {
+      let s = 0
+      for (let d = -radio; d <= radio; d++) {
+        const xx = x + d
+        if (xx >= 0 && xx < ancho) s += v[xx + y * ancho]
+      }
+      tmp[x + y * ancho] = s / n
+    }
+  for (let y = 0; y < alto; y++)
+    for (let x = 0; x < ancho; x++) {
+      let s = 0
+      for (let d = -radio; d <= radio; d++) {
+        const yy = y + d
+        if (yy >= 0 && yy < alto) s += tmp[x + yy * ancho]
+      }
+      v[x + y * ancho] = s / n
+    }
+}
 
 const hora = (segundos: number) => {
   const m = Math.floor(segundos / 60)
@@ -43,6 +71,14 @@ export class ModoSimulacion {
   /** Con qué cajas se construyó la navegación: si cambian, hay que rehacerla. */
   private cajasNav = ''
   private ajustesAbiertos = false
+  /** Mapa de calor encendido, y si ya se ha pedido el resultado del día. */
+  private calor = false
+  private conResultado = false
+  private resultado = el('div', 'resultado-sim')
+  /** El mapa de calor se pinta en un lienzo de una celda por píxel y se escala suavizado. */
+  private lienzoCalor = document.createElement('canvas')
+  private texturaCalor: Texture | null = null
+  private spriteCalor = new Sprite()
   private enMarcha = false
   private ultimo = 0
   private datos = el('div', 'datos-sim')
@@ -55,7 +91,7 @@ export class ModoSimulacion {
   constructor(plan: Plan, alCambiar: () => void) {
     this.plan = plan
     this.alCambiar = alCambiar
-    this.vista.addChild(this.g)
+    this.vista.addChild(this.spriteCalor, this.g)
   }
 
   /** Prepara la simulación con la tienda tal como está. Devuelve un mensaje si no se puede. */
@@ -102,6 +138,8 @@ export class ModoSimulacion {
     const h = this.historico!
     this.prepararNavegacion()
     this.sim = new Simulacion(this.plan, this.nav!, h, h.dias[this.dia], this.ajustes!)
+    this.conResultado = false
+    this.resultado.replaceChildren()
     const adelanto = this.desde * 3600 - this.sim.tiempo
     if (adelanto > 0) this.sim.avanzar(adelanto)
     this.alCambiar()
@@ -140,6 +178,8 @@ export class ModoSimulacion {
     const nav = this.nav!
     const radio = Math.max(RADIO, RADIO_MIN_PX / cam.zoom)
     const celda = 0.5
+    this.spriteCalor.visible = this.calor
+    if (this.calor) this.dibujarCalor(sim, nav)
     // Mostradores y terminales de autopago, y los cajeros detrás de sus cajas.
     for (const p of nav.puestos) {
       for (const k of p.mueble) {
@@ -215,6 +255,7 @@ export class ModoSimulacion {
           this.construirPanel()
         }),
       )
+    velocidades.append(boton('Resultado', 'opcion resultado', () => this.verResultado(), Trophy))
 
     this.panel.append(
       el('p', 'subtitulo', 'Simulación'),
@@ -224,12 +265,123 @@ export class ModoSimulacion {
       controles,
       el('p', 'subtitulo', 'Velocidad (minutos de tienda por segundo)'),
       velocidades,
+      this.resultado,
       this.datos,
       this.aviso,
       this.construirAjustes(),
       el('p', 'atajos', 'Cada ticket del día es un cliente que compra; el resto de la gente que entra solo mira. Mismo día, misma gente: lo que cambia es la tienda.'),
     )
+    if (this.conResultado) this.pintarResultado()
     this.refrescar()
+  }
+
+  /**
+   * Termina el día de golpe y enseña cómo ha ido: cuánto más (o menos) ha tardado cada cliente en pagar
+   * que en el histórico, y cuántos se fueron sin pagar. Enciende el mapa de calor.
+   */
+  private verResultado() {
+    const sim = this.sim
+    if (!sim) return
+    this.enMarcha = false
+    this.construirPanel()
+    // Con pocas cajas, terminar el día cuesta unos segundos: primero se avisa, luego se calcula.
+    this.resultado.replaceChildren(el('p', 'subtitulo', 'Calculando el resto del día…'))
+    setTimeout(() => {
+      if (!sim.terminado) sim.terminar()
+      this.conResultado = true
+      this.calor = true
+      this.pintarResultado()
+      this.alCambiar()
+    }, 30)
+  }
+
+  private pintarResultado() {
+    const r = this.sim!.resumen()
+    const bloque = (titulo: string, valor: string, clase: string, detalle: string) => {
+      const b = el('div', `cifra ${clase}`)
+      b.append(el('span', 'titulo', titulo), el('strong', '', valor), el('span', 'detalle', detalle))
+      return b
+    }
+    const d = r.desfasePago
+    const signo = d > 0 ? '+' : d < 0 ? '−' : ''
+    const tono = (malo: boolean, bueno: boolean) => (malo ? 'mal' : bueno ? 'bien' : '')
+    const calor = boton(this.calor ? 'Ocultar mapa de calor' : 'Ver mapa de calor', 'secundario', () => {
+      this.calor = !this.calor
+      this.pintarResultado()
+      this.alCambiar()
+    }, Flame)
+    this.resultado.replaceChildren(
+      el('p', 'subtitulo', 'Resultado del día'),
+      bloque(
+        'Eficiencia',
+        `${signo}${formatear(Math.abs(d))} min`,
+        tono(d > 0.25, d < -0.25),
+        d > 0.25
+          ? 'Cada cliente tarda de media más en pagar que en el histórico.'
+          : d < -0.25
+            ? 'Cada cliente tarda de media menos en pagar que en el histórico.'
+            : 'Igual que en el histórico.',
+      ),
+      bloque(
+        'Clientes perdidos',
+        String(r.perdidos),
+        tono(r.perdidos > 0, false),
+        r.perdidos ? `${formatear(r.eurosPerdidos, 0)} € sin cobrar: se cansaron de esperar en caja.` : 'Nadie dejó la compra en la fila.',
+      ),
+      this.leyendaCalor(),
+      calor,
+    )
+  }
+
+  private leyendaCalor() {
+    const l = el('div', 'leyenda-calor')
+    l.hidden = !this.calor
+    l.append(el('span', '', 'Poca espera'), el('span', 'degradado'), el('span', '', 'Mucha'))
+    return l
+  }
+
+  /**
+   * Mapa de calor: tiempo parado sin poder avanzar o esperando en fila en cada celda. Se difumina y se pinta
+   * en un lienzo de una celda por píxel que se escala suavizado: salen manchas, no cuadros.
+   * Las paradas para coger un producto no cuentan: si no, ardería cualquier estantería.
+   */
+  private dibujarCalor(sim: Simulacion, nav: Navegacion) {
+    const { ancho, alto } = nav
+    const v = Float32Array.from(sim.atascos)
+    difuminar(v, ancho, alto, 2)
+    difuminar(v, ancho, alto, 2)
+    // Escala con el percentil 95 de lo que tiene algo: un solo punto muy caliente no apaga el resto.
+    const valores = [...v].filter((x) => x > 0).sort((a, b) => a - b)
+    const tope = valores.length ? valores[Math.floor(valores.length * 0.95)] || valores[valores.length - 1] : 1
+
+    const lienzo = this.lienzoCalor
+    if (lienzo.width !== ancho || lienzo.height !== alto) {
+      lienzo.width = ancho
+      lienzo.height = alto
+      this.texturaCalor?.destroy(true)
+      this.texturaCalor = null
+    }
+    const ctx = lienzo.getContext('2d')!
+    const img = ctx.createImageData(ancho, alto)
+    for (let k = 0; k < v.length; k++) {
+      const t = Math.min(1, v[k] / tope)
+      if (t < 0.02) continue
+      // Suave al principio, para que lo poco apenas se vea y lo mucho destaque.
+      const a = t * t * (3 - 2 * t)
+      img.data[4 * k] = CALOR_BAJO[0] + (CALOR_ALTO[0] - CALOR_BAJO[0]) * a
+      img.data[4 * k + 1] = CALOR_BAJO[1] + (CALOR_ALTO[1] - CALOR_BAJO[1]) * a
+      img.data[4 * k + 2] = CALOR_BAJO[2] + (CALOR_ALTO[2] - CALOR_BAJO[2]) * a
+      img.data[4 * k + 3] = Math.round(255 * 0.78 * a)
+    }
+    ctx.putImageData(img, 0, 0)
+    if (!this.texturaCalor) {
+      this.texturaCalor = Texture.from(lienzo)
+      this.texturaCalor.source.scaleMode = 'linear'
+      this.spriteCalor.texture = this.texturaCalor
+    } else this.texturaCalor.source.update()
+    // Cada píxel es una celda de 50 cm, empezando en la primera celda de la rejilla.
+    this.spriteCalor.position.set(nav.i0 * 0.5, nav.j0 * 0.5)
+    this.spriteCalor.scale.set(0.5)
   }
 
   /** Ajustes de la simulación: baños, probadores, cajas y trabajadores. Cambiar algo vuelve a empezar el día. */
@@ -270,6 +422,7 @@ export class ModoSimulacion {
       el('p', 'subtitulo', 'Cajas'),
       numero('Cajas con cajero', 'aj-cajas', a.cajas, 0, 30, (v) => (a.cajas = v)),
       numero('Autopagos', 'aj-autopagos', a.autopagos, 0, 30, (v) => (a.autopagos = v)),
+      numero('Paciencia en caja (min)', 'aj-paciencia', a.pacienciaCaja, 1, 120, (v) => (a.pacienciaCaja = v)),
       el('p', 'subtitulo', 'Trabajadores por sección'),
     )
     for (const area of this.plan.areas.filter((x) => x.tipo === 'seccion'))

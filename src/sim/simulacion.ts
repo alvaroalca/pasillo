@@ -57,12 +57,14 @@ export interface Ajustes {
   autopagos: number
   /** Trabajadores reponiendo en cada sección (id de área → cuántos). */
   trabajadores: Record<number, number>
+  /** Minutos que aguanta un cliente esperando para pagar antes de dejar la compra e irse. */
+  pacienciaCaja: number
 }
 
 export function ajustesIniciales(plan: Plan): Ajustes {
   const trabajadores: Record<number, number> = {}
   for (const a of plan.areas) if (a.tipo === 'seccion') trabajadores[a.id] = 1
-  return { banos: 0.08, probadores: 0.3, vuelven: 0.4, cajas: 6, autopagos: 4, trabajadores }
+  return { banos: 0.08, probadores: 0.3, vuelven: 0.4, cajas: 6, autopagos: 4, trabajadores, pacienciaCaja: 15 }
 }
 
 /** Frentes como mucho que recorre el que compra en cada sección (los más cercanos primero). */
@@ -90,6 +92,8 @@ export interface Cliente {
   puesto: Puesto | null
   /** Segundos esperando en la fila de cajas. */
   esperaCaja: number
+  /** Se cansó de esperar y se fue sin pagar. */
+  perdido: boolean
   /** Secciones que le faltan: id de área y unidades que compra en ella. */
   pendientes: { area: number; unidades: number }[]
   euros: number
@@ -133,6 +137,9 @@ export interface Resumen {
   minutosFila: number
   /** Gente en cada fila ahora mismo. */
   enFila: Record<TipoPuesto, number>
+  /** Los que se cansaron de esperar para pagar y se fueron sin comprar, y lo que no se cobró. */
+  perdidos: number
+  eurosPerdidos: number
   /** Secciones del histórico que no están en el plano (sus clientes se las saltan). */
   sinSitio: string[]
 }
@@ -160,6 +167,7 @@ export class Simulacion {
   /** Filas únicas de cajas y puestos ocupados. */
   private filas: Record<TipoPuesto, Cliente[]> = { cajero: [], autopago: [] }
   private ocupados = new Set<Puesto>()
+  private paciencia: number
   /** Hora de pago del histórico de cada cliente que compra, para medir el desfase. */
   private pagoHistorico = new Map<Cliente, number>()
   private pagoSimulado = new Map<Cliente, number>()
@@ -168,6 +176,7 @@ export class Simulacion {
 
   constructor(plan: Plan, nav: Navegacion, historico: Historico, dia: Dia, ajustes: Ajustes = ajustesIniciales(plan)) {
     this.nav = nav
+    this.paciencia = ajustes.pacienciaCaja * 60
     this.tiempo = historico.apertura * 60
     this.cierre = historico.cierre * 60
     this.ocupacion = new Uint16Array(nav.ancho * nav.alto)
@@ -195,6 +204,7 @@ export class Simulacion {
       fila: null,
       puesto: null,
       esperaCaja: 0,
+      perdido: false,
       pendientes,
       euros,
       entrada,
@@ -468,6 +478,17 @@ export class Simulacion {
     this.bajar(c, campo, salir ? 'salida' : 'compra', aqui)
   }
 
+  /** Si lleva más de la paciencia esperando para pagar, deja la compra y se va. */
+  private cansado(c: Cliente): boolean {
+    if (c.esperaCaja <= this.paciencia) return false
+    const fila = this.filas[c.fila!]
+    const i = fila.indexOf(c)
+    if (i !== -1) fila.splice(i, 1)
+    c.perdido = true
+    c.fase = 'saliendo'
+    return true
+  }
+
   /** Ir a la fila, esperar turno, ir al puesto que le toque y pagar. */
   private pagarEnCaja(c: Cliente) {
     const nav = this.nav
@@ -478,9 +499,11 @@ export class Simulacion {
         c.fase = 'saliendo'
         return
       }
+      if (this.cansado(c)) return
       // Con la fila llena no se acerca: espera donde está (y cuenta como espera de caja), sin taponar pasillos.
       if (this.filas[c.fila!].length >= nav.filas[c.fila!].length) {
         c.esperaCaja += PASO
+        this.atascos[c.celda] += PASO
         return
       }
       // Entra en la fila al llegar a 3 m de ella: el orden es el de llegada.
@@ -493,7 +516,9 @@ export class Simulacion {
       return
     }
     if (c.fase === 'en-fila') {
+      if (this.cansado(c)) return
       c.esperaCaja += PASO
+      this.atascos[c.celda] += PASO
       // Avanza hacia su sitio en la fila (el que le toca según cuántos tiene delante).
       const sitios = nav.filas[c.fila!]
       const puesto = Math.min(this.filas[c.fila!].indexOf(c), sitios.length - 1)
@@ -728,9 +753,15 @@ export class Simulacion {
     let salidos = 0
     let desfase = 0
     let fila = 0
+    let perdidos = 0
+    let eurosPerdidos = 0
     for (const c of this.clientes) {
+      if (c.perdido) {
+        perdidos++
+        eurosPerdidos += c.euros
+      }
       if (c.fase !== 'ido') dentro++
-      else if (c.compra) {
+      else if (c.compra && !c.perdido) {
         hanComprado++
         euros += c.euros
         minutos += (c.salida - c.entrada) / 60
@@ -751,8 +782,19 @@ export class Simulacion {
       desfasePago: salidos ? desfase / salidos : 0,
       minutosFila: salidos ? fila / salidos : 0,
       enFila: { cajero: this.filas.cajero.length, autopago: this.filas.autopago.length },
+      perdidos,
+      eurosPerdidos,
       sinSitio: this.sinSitio,
     }
+  }
+
+  get terminado() {
+    return this.tiempo >= this.cierre && this.siguiente >= this.llegadas.length && this.clientes.every((c) => c.fase === 'ido')
+  }
+
+  /** Termina el día de golpe: hasta que cierra y se va el último (con un tope de 3 h tras el cierre). */
+  terminar() {
+    while (this.tiempo < this.cierre + 3 * 3600 && !this.terminado) this.avanzar(60)
   }
 
   /** Esperando fuera porque la entrada estaba llena. */
