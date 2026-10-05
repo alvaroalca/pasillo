@@ -7,7 +7,8 @@ Pieza de portfolio. Nace de cuatro años de Álvaro en Decathlon. Nombre públic
 ## Stack
 
 - TypeScript + Vite + PixiJS 8. Sin backend: una tienda es un JSON.
-- Salida estática con rutas relativas (`base: './'`). La CSP del portfolio no admite nada en línea: ni scripts ni estilos en `index.html`.
+- Salida estática con rutas relativas (`base: './'`). La CSP del portfolio no admite nada en línea (ni scripts ni estilos en `index.html`) ni `eval`: por eso `main.ts` importa `pixi.js/unsafe-eval`. La fuente va servida desde el propio sitio (`font-src 'self'`, añadido al portfolio el 2026-10-05).
+- Publicar: `npm run build` y copiar `dist/` entero a `public/pasillo/` del portfolio (`C:\Mis Proyectos\pagina web promocion`); no editar la copia. Ficha en `public/projects/pasillo/`.
 - Solo escritorio (el portfolio es de PC).
 
 ## Decisiones cerradas
@@ -49,7 +50,7 @@ Pieza de portfolio. Nace de cuatro años de Álvaro en Decathlon. Nombre públic
 - Vista cenital plana, fondo gris muy claro y frío. Nada de crema ni naranja.
 - Secciones: manchas planas de color suave. Góndolas: barras gris carbón con esquinas redondeadas.
 - Clientes: puntos verdes con rastro corto. Trabajadores: puntos rojos.
-- Tipografía sans redonda, alojada en el propio proyecto (la CSP del portfolio no deja cargar fuentes de fuera).
+- Tipografía sans redonda (Nunito), alojada en el propio proyecto.
 
 **Editor** (estilo Paint/Figma, decidido el 2026-10-05)
 - La herramienta activa solo decide qué se crea al pulsar en vacío. Lo que ya existe se edita desde cualquier herramienta (`edicion.ts`).

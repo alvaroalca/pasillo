@@ -1,5 +1,7 @@
 import '@fontsource/nunito/600.css'
 import '@fontsource/nunito/800.css'
+// La CSP del portfolio no admite eval: PixiJS genera sus sombreadores sin él.
+import 'pixi.js/unsafe-eval'
 import { Application, Container, Graphics } from 'pixi.js'
 import {
   abrir,
