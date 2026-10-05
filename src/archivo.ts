@@ -177,6 +177,16 @@ export function cargarLocal(): Plan | null {
   }
 }
 
+/** La tienda demo que va con la app (`public/demo.json`). Null si no se puede leer. */
+export async function cargarDemo(): Promise<Plan | null> {
+  try {
+    const r = await fetch('demo.json')
+    return r.ok ? deserializar(await r.text()) : null
+  } catch {
+    return null
+  }
+}
+
 export function descargar(plan: Plan) {
   const url = URL.createObjectURL(new Blob([serializar(plan)], { type: 'application/json' }))
   const a = document.createElement('a')

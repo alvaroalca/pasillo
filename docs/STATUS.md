@@ -10,13 +10,15 @@
 
 **Ajustes tras la tanda 3**: con Puerta en la mano los muros no se cogen (`sobreMuros`, como Muro), para poder poner puertas en muros interiores. Pincel y goma con selector de forma Pincel / Rectángulo; el rectángulo enseña sus medidas mientras se arrastra (probado).
 
-**Mueble y secciones en el mueble (hecho, pendiente de prueba a mano)**: herramientas Cabecera (C), Cubo (U) y Expo (X). Las secciones se pintan en las caras de góndola por tramos de 50 cm, en cabeceras y en piezas; el suelo solo lleva zonas sin venta. Lineal y piezas por sección en el panel. Formato de archivo v2 con migración de v1 (comprobada en Node, igual que lineal, choques entre mueble y copia de góndolas). Capa "Góndolas" pasa a llamarse Mobiliario. Botones de opción activos ahora con fondo de acento (antes salían en blanco).
+**Mueble y secciones en el mueble (hecho y probado)**: herramientas Cabecera (C), Cubo (U) y Expo (X). Las secciones se pintan en las caras de góndola por tramos de 50 cm, en cabeceras y en piezas; el suelo solo lleva zonas sin venta. Lineal y piezas por sección en el panel. Formato de archivo v2 con migración de v1 (comprobada en Node, igual que lineal, choques entre mueble y copia de góndolas). Capa "Góndolas" pasa a llamarse Mobiliario. Botones de opción activos ahora con fondo de acento (antes salían en blanco).
+
+**Tienda demo (definitiva, retocada por Álvaro)**: `public/demo.json`. Concepto de Álvaro: se entra por una esquina (abajo a la derecha), se recorre la tienda hasta el centro y del centro se baja a cajas (abajo, en el centro). Sala de 60 × 42 m en L con anexo de zona privada y baños; pasillos perpendiculares a la fachada en dos tramos con cabeceras, pasillo transversal con cubos, expos grandes de Ciclismo (arriba a la derecha) y Agua (zona abierta) con dos cubos de Agua; probadores junto a cajas. Lo que más factura, lo más lejos de la entrada (Fitness al fondo a la izquierda); Naturaleza, en la esquina con menos paso. El lineal sigue el orden de facturación que dio Álvaro: Fitness 115 m, Montaña 99, Colectivos 88, Agua 79, Ciclismo 74, Running 72, Raqueta 50, Naturaleza 25. Se abre sola si el navegador no tiene tienda guardada y desde el menú (Abrir tienda demo).
 
 Antes, ya probado: contorno con escala, puertas, góndolas con lineal útil, secciones y zonas pintadas, guardar y cargar (autoguardado + `.json`).
 
 ## Siguiente
 
-- Fase 2: tienda demo y simulación sencilla.
+- Fase 2: simulación sencilla.
 
 
 ## Conocido

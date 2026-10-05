@@ -8,6 +8,7 @@ import { CAPAS, metrosLineal, NOMBRE_CAPA, type Plan } from './plan'
 export interface Acciones {
   elegir(h: Herramienta): void
   nueva(): void
+  demo(): void
   abrir(): void
   guardar(): void
   deshacer(): void
@@ -60,6 +61,7 @@ export class Interfaz {
       })
     this.menu.append(
       opcion('Nueva tienda', () => acciones.nueva()),
+      opcion('Abrir tienda demo', () => acciones.demo()),
       opcion('Abrir archivo…', () => acciones.abrir()),
       opcion('Guardar archivo', () => acciones.guardar()),
     )

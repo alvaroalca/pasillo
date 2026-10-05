@@ -1,7 +1,7 @@
 import '@fontsource/nunito/600.css'
 import '@fontsource/nunito/800.css'
 import { Application, Graphics } from 'pixi.js'
-import { abrir, cargarLocal, descargar, deserializar, guardarLocal } from './archivo'
+import { abrir, cargarDemo, cargarLocal, descargar, deserializar, guardarLocal } from './archivo'
 import { Camara } from './camara'
 import { Edicion } from './edicion'
 import { caja } from './geometria'
@@ -38,7 +38,8 @@ const cam = new Camara()
 cam.x = window.innerWidth / 2
 cam.y = window.innerHeight / 2
 
-const plan = cargarLocal() ?? planVacio()
+// La primera vez (nada guardado en este navegador) se abre la tienda demo.
+const plan = cargarLocal() ?? (await cargarDemo()) ?? planVacio()
 const historial = new Historial(plan)
 
 const ctx: Contexto = {
@@ -114,6 +115,13 @@ const interfaz = new Interfaz(herramientas, plan, edicion, historial, {
     const hayAlgo = plan.contorno || plan.celdas.size > 0
     if (hayAlgo && !confirm('Se borrará la tienda actual (se puede deshacer). ¿Seguir?')) return
     cargar(planVacio())
+    historial.confirmar(plan)
+  },
+  demo: async () => {
+    const demo = await cargarDemo()
+    if (!demo) return alert('No se ha podido cargar la tienda demo.')
+    if (plan.contorno && !confirm('Se sustituirá la tienda actual por la demo (se puede deshacer). ¿Seguir?')) return
+    cargar(demo)
     historial.confirmar(plan)
   },
   abrir: () =>
