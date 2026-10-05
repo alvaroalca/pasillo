@@ -640,3 +640,75 @@ body.simulando .panel-sim {
   border-radius: 4px;
   background: linear-gradient(90deg, rgb(244 154 150 / 0.15), rgb(232 110 108 / 0.55), rgb(196 38 48 / 0.8));
 }
+
+/* Rótulos de la pantalla partida: abajo, centrados en cada mitad. */
+.rotulo-mitad {
+  position: fixed;
+  bottom: 18px;
+  z-index: 1;
+  transform: translateX(-50%);
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--muro);
+  color: #fff;
+  font-weight: 800;
+  font-size: 14px;
+  pointer-events: none;
+}
+
+.panel .secundario.activo {
+  color: var(--acento);
+  box-shadow: inset 0 0 0 2px var(--acento);
+}
+
+.panel-sim > .secundario {
+  margin: 12px 0 4px;
+}
+
+.dato-sim.doble {
+  display: grid;
+  grid-template-columns: 1fr 64px 64px;
+  text-align: right;
+}
+
+.dato-sim.doble span {
+  text-align: left;
+}
+
+.dato-sim.cabecera strong {
+  color: var(--texto-suave);
+  font-size: 12px;
+}
+
+.columnas-resultado {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.columna-resultado {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+
+.columna-resultado .cifra strong {
+  font-size: 20px;
+}
+
+.panel .diferencia {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px var(--borde);
+  font-weight: 800;
+}
+
+.panel .diferencia.bien {
+  color: var(--cliente);
+}
+
+.panel .diferencia.mal {
+  color: var(--error);
+}

@@ -10,6 +10,9 @@ export interface Acciones {
   nueva(): void
   demo(): void
   abrir(): void
+  /** Foto de la tienda actual como versión A, o un archivo como versión A, para compararla en la simulación. */
+  fijarA(): void
+  abrirA(): void
   guardar(): void
   deshacer(): void
   rehacer(): void
@@ -67,6 +70,8 @@ export class Interfaz {
       opcion('Abrir tienda demo', () => acciones.demo()),
       opcion('Abrir archivo…', () => acciones.abrir()),
       opcion('Guardar archivo', () => acciones.guardar()),
+      opcion('Fijar como versión A', () => acciones.fijarA()),
+      opcion('Abrir archivo como versión A…', () => acciones.abrirA()),
     )
     document.addEventListener('pointerdown', (e) => {
       if (!(e.target instanceof Node) || !this.barra.contains(e.target)) this.menu.classList.remove('abierto')

@@ -1,11 +1,21 @@
 import '@fontsource/nunito/600.css'
 import '@fontsource/nunito/800.css'
-import { Application, Graphics } from 'pixi.js'
-import { abrir, cargarDemo, cargarLocal, descargar, deserializar, guardarLocal } from './archivo'
+import { Application, Container, Graphics } from 'pixi.js'
+import {
+  abrir,
+  cargarDemo,
+  cargarLocal,
+  cargarVersionA,
+  descargar,
+  deserializar,
+  guardarLocal,
+  guardarVersionA,
+  serializar,
+} from './archivo'
 import { Camara } from './camara'
 import { Edicion } from './edicion'
 import { caja } from './geometria'
-import type { Contexto, Elemento, Herramienta, Mods, Seleccion } from './herramienta'
+import { el, type Contexto, type Elemento, type Herramienta, type Mods, type Seleccion } from './herramienta'
 import { HerramientaCabecera } from './herramienta-cabecera'
 import { HerramientaGondola } from './herramienta-gondola'
 import { HerramientaMuro } from './herramienta-muro'
@@ -55,6 +65,15 @@ const ctx: Contexto = {
 
 const rejilla = new Graphics()
 const plano = new Plano(cam, plan)
+
+// Versión A: la foto de la tienda con la que se compara en la simulación (pantalla partida, A a la izquierda).
+// Tiene su propia cámara, que es la de B desplazada media pantalla.
+const guardadaA = cargarVersionA()
+const planA = guardadaA ?? planVacio()
+let hayVersionA = guardadaA !== null
+const camA = new Camara()
+const rejillaA = new Graphics()
+const planoA = new Plano(camA, planA)
 const edicion = new Edicion(ctx)
 const pincel: EstadoPincel = { forma: 'pincel', tamano: 4, area: null }
 
@@ -71,9 +90,41 @@ const herramientas: Herramienta[] = [
 ]
 const herramienta = (id: Herramienta['id']) => herramientas.find((h) => h.id === id)!
 let activa = herramienta(plan.contorno ? 'seleccionar' : 'muro')
-const simulacion = new ModoSimulacion(plan, () => pedirDibujo())
+let comparando = false
+const simulacion = new ModoSimulacion(plan, planA, {
+  alCambiar: () => pedirDibujo(),
+  hayVersionA: () => hayVersionA,
+  alComparar: (si) => {
+    comparando = si
+    encuadrar()
+  },
+})
 let simulando = false
-app.stage.addChild(rejilla, plano.vista, simulacion.vista, ...herramientas.map((h) => h.vista), edicion.vista)
+
+// Dos mitades recortadas: A a la izquierda (solo al comparar) y B, la tienda actual, a la derecha o en toda la pantalla.
+const mitadA = new Container()
+const mitadB = new Container()
+const mascaraA = new Graphics()
+const mascaraB = new Graphics()
+const separador = new Graphics()
+mitadA.addChild(rejillaA, planoA.vista, simulacion.a.vista)
+mitadB.addChild(rejilla, plano.vista, simulacion.b.vista)
+app.stage.addChild(mitadA, mitadB, mascaraA, mascaraB, separador, ...herramientas.map((h) => h.vista), edicion.vista)
+const rotuloA = el('div', 'rotulo-mitad', 'A · versión A')
+const rotuloB = el('div', 'rotulo-mitad', 'B · tienda actual')
+document.body.append(rotuloA, rotuloB)
+
+/** Ancho de la zona de la tienda a la izquierda del panel de la simulación, y dónde se parte en dos. */
+const PANEL = 330
+const mitad = () => (window.innerWidth - PANEL) / 2
+const partida = () => simulando && comparando
+
+/** La cámara de A es la de B desplazada media pantalla: moverse o hacer zoom afecta a las dos igual. */
+function seguirCamaraA() {
+  camA.zoom = cam.zoom
+  camA.x = cam.x - mitad()
+  camA.y = cam.y
+}
 
 function elegir(h: Herramienta) {
   if (h === activa || (h.necesitaContorno && !plan.contorno)) return
@@ -84,7 +135,12 @@ function elegir(h: Herramienta) {
 }
 
 function encuadrar() {
-  if (plan.contorno) cam.encuadrar(caja(plan.contorno), window.innerWidth, window.innerHeight)
+  if (partida()) {
+    // Las dos tiendas en su mitad, a la misma escala: la caja que abarca a las dos, en media pantalla.
+    const puntos = [...(plan.contorno ?? []), ...(planA.contorno ?? [])]
+    if (puntos.length) cam.encuadrar(caja(puntos), mitad(), window.innerHeight)
+    cam.x += mitad()
+  } else if (plan.contorno) cam.encuadrar(caja(plan.contorno), window.innerWidth, window.innerHeight)
   pedirDibujo()
 }
 
@@ -136,6 +192,18 @@ const interfaz = new Interfaz(herramientas, plan, edicion, historial, {
       })
       .catch((e: Error) => alert(e.message)),
   guardar: () => descargar(plan),
+  fijarA: () => {
+    fijarVersionA(deserializar(serializar(plan)))
+    alert('Versión A fijada. Cambia la tienda y, en Simular, compárala con esta versión.')
+  },
+  abrirA: () =>
+    abrir()
+      .then((nuevo) => {
+        if (!nuevo) return
+        fijarVersionA(nuevo)
+        alert('Archivo abierto como versión A. En Simular puedes compararlo con la tienda actual.')
+      })
+      .catch((e: Error) => alert(e.message)),
   deshacer,
   rehacer,
   escalar: (m2) => {
@@ -156,7 +224,7 @@ const interfaz = new Interfaz(herramientas, plan, edicion, historial, {
       simulando = true
     }
     interfaz.modoSimulacion(simulando)
-    pedirDibujo()
+    encuadrar()
   },
   capas: () => {
     // Lo que queda oculto no puede seguir seleccionado.
@@ -167,6 +235,40 @@ const interfaz = new Interfaz(herramientas, plan, edicion, historial, {
 })
 interfaz.montar(simulacion.panel)
 
+/** Guarda la versión A en el navegador y la pone en su plano (el objeto `planA` es el mismo: todos lo tienen). */
+function fijarVersionA(nuevo: Plan) {
+  const version = planA.version
+  Object.assign(planA, nuevo)
+  planA.version = version + 1
+  hayVersionA = true
+  guardarVersionA(planA)
+}
+
+/** Recorta las dos mitades y coloca separador y rótulos (o lo quita todo si no se compara). */
+function colocarMitades() {
+  const ancho = window.innerWidth
+  const alto = window.innerHeight
+  const m = mitad()
+  const si = partida()
+  mitadA.visible = si
+  separador.clear()
+  rotuloA.hidden = !si
+  rotuloB.hidden = !si
+  mascaraA.clear()
+  mascaraB.clear()
+  if (!si) {
+    mitadB.mask = null
+    return
+  }
+  mascaraA.rect(0, 0, m, alto).fill({ color: 0xffffff })
+  mascaraB.rect(m, 0, ancho - m, alto).fill({ color: 0xffffff })
+  mitadA.mask = mascaraA
+  mitadB.mask = mascaraB
+  separador.moveTo(m, 0).lineTo(m, alto).stroke({ width: 2, color: tema.muro, alpha: 0.35 })
+  rotuloA.style.left = `${m / 2}px`
+  rotuloB.style.left = `${m * 1.5}px`
+}
+
 // Se repinta solo cuando algo cambia, una vez por frame como mucho.
 let pendiente = false
 function pedirDibujo() {
@@ -176,11 +278,17 @@ function pedirDibujo() {
     pendiente = false
     dibujarRejilla(rejilla, cam, window.innerWidth, window.innerHeight)
     plano.dibujar()
+    colocarMitades()
+    if (partida()) {
+      seguirCamaraA()
+      dibujarRejilla(rejillaA, camA, window.innerWidth, window.innerHeight)
+      planoA.dibujar()
+    }
     if (simulando) {
       // Simulando no se edita: fuera herramientas y selección, dentro los clientes.
       for (const h of herramientas) h.vista.visible = false
       edicion.vista.visible = false
-      simulacion.dibujar(cam)
+      simulacion.dibujar(camA, cam)
       lienzo.style.cursor = moviendo ? 'grabbing' : 'grab'
       return
     }
@@ -306,7 +414,9 @@ lienzo.addEventListener(
   'wheel',
   (e) => {
     e.preventDefault()
-    cam.zoomEn(e.offsetX, e.offsetY, Math.exp(-e.deltaY * 0.0015))
+    // En la mitad de A, el punto bajo el ratón es el de la cámara de B desplazado media pantalla.
+    const x = partida() && e.offsetX < mitad() ? e.offsetX + mitad() : e.offsetX
+    cam.zoomEn(x, e.offsetY, Math.exp(-e.deltaY * 0.0015))
     apuntar({ x: e.offsetX, y: e.offsetY }, modsDe(e))
     pedirDibujo()
   },
@@ -358,7 +468,7 @@ window.addEventListener('keydown', (e) => {
 window.addEventListener('keyup', (e) => {
   if (e.code === 'Space') espacio = false
 })
-window.addEventListener('resize', () => pedirDibujo())
+window.addEventListener('resize', () => (partida() ? encuadrar() : pedirDibujo()))
 
 if (plan.contorno) encuadrar()
 pedirDibujo()

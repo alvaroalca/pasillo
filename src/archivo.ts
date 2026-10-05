@@ -177,6 +177,27 @@ export function cargarLocal(): Plan | null {
   }
 }
 
+const CLAVE_VERSION_A = 'planta:version-a'
+
+/** La versión A (la foto de la tienda con la que comparar) se guarda en el navegador, como la tienda. */
+export function guardarVersionA(plan: Plan): boolean {
+  try {
+    localStorage.setItem(CLAVE_VERSION_A, serializar(plan))
+    return true
+  } catch {
+    return false
+  }
+}
+
+export function cargarVersionA(): Plan | null {
+  try {
+    const texto = localStorage.getItem(CLAVE_VERSION_A)
+    return texto ? deserializar(texto) : null
+  } catch {
+    return null
+  }
+}
+
 /** La tienda demo que va con la app (`public/demo.json`). Null si no se puede leer. */
 export async function cargarDemo(): Promise<Plan | null> {
   try {

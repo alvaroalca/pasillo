@@ -1,46 +1,14 @@
-import { Flame, Pause, Play, Trophy } from 'lucide'
-import { Container, Graphics, Sprite, Texture } from 'pixi.js'
+import { Columns2, Flame, Pause, Play, Trophy } from 'lucide'
 import type { Camara } from './camara'
+import { Corrida } from './corrida'
 import { boton, el, formatear } from './herramienta'
 import type { Plan } from './plan'
 import { cargarHistorico, eurosDia, type Historico } from './sim/historico'
-import { Navegacion } from './sim/navegacion'
-import { ajustesIniciales, Simulacion, type Ajustes, type Cliente } from './sim/simulacion'
-import { tema } from './tema'
+import { ajustesIniciales, type Ajustes, type Resumen } from './sim/simulacion'
 
 /** Minutos de tienda por segundo real: ×1 es un minuto por segundo (una hora en un minuto). */
 const VELOCIDADES = [1, 2, 5, 10]
-const RADIO = 0.32 // m: una persona vista desde arriba, algo exagerada para que se vea
-const RADIO_MIN_PX = 3 // de lejos, que no desaparezcan
 const MAX_POR_FOTOGRAMA = 20 // s de simulación como mucho por fotograma, para no congelar la pantalla
-
-/** Calor: de coral claro casi transparente (poco) a rojo intenso (mucho). Un solo tono, que no se confunde con las secciones. */
-const CALOR_BAJO = [0xf4, 0x9a, 0x96]
-const CALOR_ALTO = [0xc4, 0x26, 0x30]
-
-/** Difuminado por cajas (separable), en el sitio: dos pasadas se parecen a un difuminado gaussiano. */
-function difuminar(v: Float32Array, ancho: number, alto: number, radio: number) {
-  const tmp = new Float32Array(v.length)
-  const n = 2 * radio + 1
-  for (let y = 0; y < alto; y++)
-    for (let x = 0; x < ancho; x++) {
-      let s = 0
-      for (let d = -radio; d <= radio; d++) {
-        const xx = x + d
-        if (xx >= 0 && xx < ancho) s += v[xx + y * ancho]
-      }
-      tmp[x + y * ancho] = s / n
-    }
-  for (let y = 0; y < alto; y++)
-    for (let x = 0; x < ancho; x++) {
-      let s = 0
-      for (let d = -radio; d <= radio; d++) {
-        const yy = y + d
-        if (yy >= 0 && yy < alto) s += tmp[x + yy * ancho]
-      }
-      v[x + y * ancho] = s / n
-    }
-}
 
 const hora = (segundos: number) => {
   const m = Math.floor(segundos / 60)
@@ -52,61 +20,72 @@ const fechaCorta = (f: string) => {
   return `${DIAS[d.getUTCDay()]} ${d.getUTCDate()}/${d.getUTCMonth() + 1}/${d.getUTCFullYear()}`
 }
 
+export interface OpcionesSimulacion {
+  /** Algo ha cambiado: repintar. */
+  alCambiar: () => void
+  /** Si hay una versión A fijada con la que comparar. */
+  hayVersionA: () => boolean
+  /** Empieza o deja de compararse: la pantalla se parte o se junta. */
+  alComparar: (comparando: boolean) => void
+}
+
 /**
- * La tienda en marcha: reproduce un día del histórico sobre el plano actual. Mientras dura, no se edita.
+ * La tienda en marcha: reproduce un día del histórico sobre el plano actual (B) y, si se compara,
+ * a la vez sobre la versión A, con el mismo día, ajustes y reloj. Mientras dura, no se edita.
  * Los clientes son puntos verdes (más claros los que no van a comprar, más oscuros pagando); el personal,
  * rojos. Las cajas y autopagos los coloca la simulación en la zona de Cajas según los Ajustes.
  */
 export class ModoSimulacion {
-  readonly vista = new Container()
   readonly panel = el('aside', 'panel panel-sim')
-  private g = new Graphics()
+  /** B: la tienda que se está editando. A: la versión fijada para comparar. */
+  readonly b: Corrida
+  readonly a: Corrida
+  comparando = false
   private historico: Historico | null = null
-  private sim: Simulacion | null = null
-  private nav: Navegacion | null = null
   private dia = 0
   private desde = 10
   private velocidad = 1
   private ajustes: Ajustes | null = null
-  /** Con qué cajas se construyó la navegación: si cambian, hay que rehacerla. */
-  private cajasNav = ''
   private ajustesAbiertos = false
   /** Mapa de calor encendido, y si ya se ha pedido el resultado del día. */
   private calor = false
   private conResultado = false
   private resultado = el('div', 'resultado-sim')
-  /** El mapa de calor se pinta en un lienzo de una celda por píxel y se escala suavizado. */
-  private lienzoCalor = document.createElement('canvas')
-  private texturaCalor: Texture | null = null
-  private spriteCalor = new Sprite()
   private enMarcha = false
   private ultimo = 0
   private datos = el('div', 'datos-sim')
   private reloj = el('div', 'reloj')
   private aviso = el('p', 'aviso')
-  private botonPlay: HTMLButtonElement | null = null
-  private plan: Plan
-  private alCambiar: () => void
+  private op: OpcionesSimulacion
 
-  constructor(plan: Plan, alCambiar: () => void) {
-    this.plan = plan
-    this.alCambiar = alCambiar
-    this.vista.addChild(this.spriteCalor, this.g)
+  constructor(planB: Plan, planA: Plan, op: OpcionesSimulacion) {
+    this.b = new Corrida(planB)
+    this.a = new Corrida(planA)
+    this.op = op
+  }
+
+  private get corridas(): Corrida[] {
+    return this.comparando ? [this.a, this.b] : [this.b]
   }
 
   /** Prepara la simulación con la tienda tal como está. Devuelve un mensaje si no se puede. */
   async entrar(): Promise<string | null> {
     this.historico ??= await cargarHistorico()
     if (!this.historico) return 'No se ha podido leer el histórico de ventas.'
-    if (!this.plan.contorno) return 'Dibuja primero la tienda.'
+    const plan = this.b.plan
+    if (!plan.contorno) return 'Dibuja primero la tienda.'
     // Los ajustes se conservan entre visitas; las secciones nuevas entran con un trabajador.
-    const base = ajustesIniciales(this.plan)
+    const base = ajustesIniciales(plan)
     this.ajustes = this.ajustes
       ? { ...this.ajustes, trabajadores: { ...base.trabajadores, ...this.soloSecciones(this.ajustes.trabajadores) } }
       : base
-    this.cajasNav = ''
-    this.prepararNavegacion()
-    if (!this.nav!.entradas.length) return 'La tienda necesita al menos una puerta de Entrada en la fachada.'
+    // La tienda puede haber cambiado desde la última vez: navegación nueva.
+    this.b.preparar(this.ajustes, true)
+    if (!this.b.nav!.entradas.length) return 'La tienda necesita al menos una puerta de Entrada en la fachada.'
+    if (this.comparando && this.prepararA()) {
+      this.comparando = false
+      this.op.alComparar(false)
+    }
     this.reiniciar()
     this.construirPanel()
     return null
@@ -114,35 +93,57 @@ export class ModoSimulacion {
 
   salir() {
     this.enMarcha = false
-    this.sim = null
-    this.g.clear()
+    this.a.limpiar()
+    this.b.limpiar()
   }
 
   /** Quita del reparto de trabajadores las secciones que ya no existen. */
   private soloSecciones(t: Record<number, number>) {
-    const ids = new Set(this.plan.areas.filter((a) => a.tipo === 'seccion').map((a) => a.id))
+    const ids = new Set(this.b.plan.areas.filter((a) => a.tipo === 'seccion').map((a) => a.id))
     return Object.fromEntries(Object.entries(t).filter(([id]) => ids.has(Number(id))))
   }
 
-  /** La navegación depende de cuántas cajas hay (sus mostradores no se pisan): se rehace solo si cambian. */
-  private prepararNavegacion() {
+  /** Los ajustes valen para las dos tiendas; los trabajadores van por sección, que en A se busca por nombre. */
+  private ajustesDeA(): Ajustes {
     const a = this.ajustes!
-    const clave = `${a.cajas}|${a.autopagos}`
-    if (clave === this.cajasNav && this.nav) return
-    this.nav = new Navegacion(this.plan, { cajas: a.cajas, autopagos: a.autopagos })
-    this.cajasNav = clave
+    const nombre = (id: number) => this.b.plan.areas.find((x) => x.id === id)?.nombre.trim().toLowerCase()
+    const trabajadores: Record<number, number> = {}
+    for (const area of this.a.plan.areas.filter((x) => x.tipo === 'seccion')) {
+      const enB = Object.entries(a.trabajadores).find(([id]) => nombre(Number(id)) === area.nombre.trim().toLowerCase())
+      trabajadores[area.id] = enB ? enB[1] : 1
+    }
+    return { ...a, trabajadores }
   }
 
-  /** Vuelve a empezar el día elegido y lo adelanta, sin pintar, hasta la hora de inicio. */
+  /** Navegación de la versión A. Devuelve un mensaje si no se puede simular. */
+  private prepararA(): string | null {
+    const plan = this.a.plan
+    if (!this.op.hayVersionA() || !plan.contorno) return 'Fija primero una versión A desde el menú (☰ → Fijar como versión A).'
+    this.a.preparar(this.ajustesDeA(), true)
+    if (!this.a.nav!.entradas.length) return 'La versión A no tiene puerta de Entrada en la fachada.'
+    return null
+  }
+
+  private alternarComparacion() {
+    if (!this.comparando) {
+      const problema = this.prepararA()
+      if (problema) return alert(problema)
+    }
+    this.comparando = !this.comparando
+    if (!this.comparando) this.a.limpiar()
+    this.op.alComparar(this.comparando)
+    this.reiniciar()
+    this.construirPanel()
+  }
+
+  /** Vuelve a empezar el día elegido en todas las tiendas y las adelanta hasta la hora de inicio. */
   private reiniciar() {
     const h = this.historico!
-    this.prepararNavegacion()
-    this.sim = new Simulacion(this.plan, this.nav!, h, h.dias[this.dia], this.ajustes!)
+    this.b.reiniciar(h, h.dias[this.dia], this.ajustes!, this.desde)
+    if (this.comparando) this.a.reiniciar(h, h.dias[this.dia], this.ajustesDeA(), this.desde)
     this.conResultado = false
     this.resultado.replaceChildren()
-    const adelanto = this.desde * 3600 - this.sim.tiempo
-    if (adelanto > 0) this.sim.avanzar(adelanto)
-    this.alCambiar()
+    this.op.alCambiar()
   }
 
   private alternar() {
@@ -155,53 +156,23 @@ export class ModoSimulacion {
   }
 
   private bucle(ahora: number) {
-    if (!this.enMarcha || !this.sim) return
+    if (!this.enMarcha || !this.b.sim) return
     const real = Math.min(0.1, (ahora - this.ultimo) / 1000)
     this.ultimo = ahora
-    this.sim.avanzar(Math.min(MAX_POR_FOTOGRAMA, real * this.velocidad * 60))
-    if (this.sim.tiempo >= this.sim.cierre + 1800 && this.sim.resumen().dentro === 0) {
+    const paso = Math.min(MAX_POR_FOTOGRAMA, real * this.velocidad * 60)
+    for (const c of this.corridas) c.sim?.avanzar(paso)
+    if (this.corridas.every((c) => c.sim!.terminado)) {
       this.enMarcha = false
       this.construirPanel()
     }
-    this.alCambiar()
+    this.op.alCambiar()
     if (this.enMarcha) requestAnimationFrame((t) => this.bucle(t))
   }
 
-  /** Pinta los clientes. La vista va en metros y sigue a la cámara. */
-  dibujar(cam: Camara) {
-    this.vista.position.set(cam.x, cam.y)
-    this.vista.scale.set(cam.zoom)
-    const g = this.g
-    g.clear()
-    const sim = this.sim
-    if (!sim) return
-    const nav = this.nav!
-    const radio = Math.max(RADIO, RADIO_MIN_PX / cam.zoom)
-    const celda = 0.5
-    this.spriteCalor.visible = this.calor
-    if (this.calor) this.dibujarCalor(sim, nav)
-    // Mostradores y terminales de autopago, y los cajeros detrás de sus cajas.
-    for (const p of nav.puestos) {
-      for (const k of p.mueble) {
-        const c = nav.centro(k)
-        g.roundRect(c.x - celda / 2 + 0.05, c.y - celda / 2 + 0.05, celda - 0.1, celda - 0.1, 0.08).fill({ color: tema.gondola })
-        if (p.tipo === 'autopago') g.rect(c.x - 0.12, c.y - 0.12, 0.24, 0.24).fill({ color: tema.acento })
-      }
-      if (p.cajero !== null) {
-        const c = nav.centro(p.cajero)
-        g.circle(c.x, c.y, radio).fill({ color: tema.trabajador })
-      }
-    }
-    const color = (c: Cliente) => (!c.compra ? tema.clienteMirando : c.fase === 'pagando' ? tema.clientePagando : tema.cliente)
-    for (const c of sim.clientes) {
-      if (c.fase === 'ido') continue
-      const p = sim.posicion(c)
-      g.circle(p.x, p.y, radio).fill({ color: color(c) })
-    }
-    for (const t of sim.personal) {
-      const p = sim.posicion(t)
-      g.circle(p.x, p.y, radio).fill({ color: tema.trabajador })
-    }
+  /** Pinta cada tienda con su cámara: A a la izquierda y B a la derecha cuando se compara. */
+  dibujar(camA: Camara, camB: Camara) {
+    this.b.dibujar(camB, this.calor)
+    if (this.comparando) this.a.dibujar(camA, this.calor)
     this.refrescar()
   }
 
@@ -245,8 +216,7 @@ export class ModoSimulacion {
     filaDesde.append(lDesde, desde)
 
     const controles = el('div', 'controles-sim')
-    this.botonPlay = boton(this.enMarcha ? 'Pausa' : 'Reproducir', 'primario', () => this.alternar(), this.enMarcha ? Pause : Play)
-    controles.append(this.botonPlay)
+    controles.append(boton(this.enMarcha ? 'Pausa' : 'Reproducir', 'primario', () => this.alternar(), this.enMarcha ? Pause : Play))
     const velocidades = el('div', 'opciones')
     for (const v of VELOCIDADES)
       velocidades.append(
@@ -257,6 +227,15 @@ export class ModoSimulacion {
       )
     velocidades.append(boton('Resultado', 'opcion resultado', () => this.verResultado(), Trophy))
 
+    const comparar = boton(
+      this.comparando ? 'Dejar de comparar' : 'Comparar con la versión A',
+      `secundario${this.comparando ? ' activo' : ''}`,
+      () => this.alternarComparacion(),
+      Columns2,
+    )
+    comparar.disabled = !this.op.hayVersionA()
+    comparar.title = this.op.hayVersionA() ? 'Pantalla partida: versión A a la izquierda, tienda actual a la derecha' : 'Fija primero una versión A desde el menú (☰)'
+
     this.panel.append(
       el('p', 'subtitulo', 'Simulación'),
       filaDia,
@@ -265,6 +244,7 @@ export class ModoSimulacion {
       controles,
       el('p', 'subtitulo', 'Velocidad (minutos de tienda por segundo)'),
       velocidades,
+      comparar,
       this.resultado,
       this.datos,
       this.aviso,
@@ -276,61 +256,100 @@ export class ModoSimulacion {
   }
 
   /**
-   * Termina el día de golpe y enseña cómo ha ido: cuánto más (o menos) ha tardado cada cliente en pagar
-   * que en el histórico, y cuántos se fueron sin pagar. Enciende el mapa de calor.
+   * Termina el día de golpe en todas las tiendas y enseña cómo ha ido: cuánto más (o menos) ha tardado
+   * cada cliente en pagar que en el histórico, y cuántos se fueron sin pagar. Enciende el mapa de calor.
    */
   private verResultado() {
-    const sim = this.sim
-    if (!sim) return
+    if (!this.b.sim) return
     this.enMarcha = false
     this.construirPanel()
     // Con pocas cajas, terminar el día cuesta unos segundos: primero se avisa, luego se calcula.
     this.resultado.replaceChildren(el('p', 'subtitulo', 'Calculando el resto del día…'))
     setTimeout(() => {
-      if (!sim.terminado) sim.terminar()
+      for (const c of this.corridas) if (!c.sim!.terminado) c.sim!.terminar()
       this.conResultado = true
       this.calor = true
       this.pintarResultado()
-      this.alCambiar()
+      this.op.alCambiar()
     }, 30)
   }
 
   private pintarResultado() {
-    const r = this.sim!.resumen()
     const bloque = (titulo: string, valor: string, clase: string, detalle: string) => {
       const b = el('div', `cifra ${clase}`)
       b.append(el('span', 'titulo', titulo), el('strong', '', valor), el('span', 'detalle', detalle))
       return b
     }
-    const d = r.desfasePago
-    const signo = d > 0 ? '+' : d < 0 ? '−' : ''
     const tono = (malo: boolean, bueno: boolean) => (malo ? 'mal' : bueno ? 'bien' : '')
-    const calor = boton(this.calor ? 'Ocultar mapa de calor' : 'Ver mapa de calor', 'secundario', () => {
-      this.calor = !this.calor
-      this.pintarResultado()
-      this.alCambiar()
-    }, Flame)
-    this.resultado.replaceChildren(
-      el('p', 'subtitulo', 'Resultado del día'),
+    const minutos = (d: number) => `${d > 0 ? '+' : d < 0 ? '−' : ''}${formatear(Math.abs(d))} min`
+    const eficiencia = (r: Resumen, detalle: boolean) =>
       bloque(
         'Eficiencia',
-        `${signo}${formatear(Math.abs(d))} min`,
-        tono(d > 0.25, d < -0.25),
-        d > 0.25
-          ? 'Cada cliente tarda de media más en pagar que en el histórico.'
-          : d < -0.25
-            ? 'Cada cliente tarda de media menos en pagar que en el histórico.'
-            : 'Igual que en el histórico.',
-      ),
+        minutos(r.desfasePago),
+        tono(r.desfasePago > 0.25, r.desfasePago < -0.25),
+        !detalle
+          ? 'por cliente'
+          : r.desfasePago > 0.25
+            ? 'Cada cliente tarda de media más en pagar que en el histórico.'
+            : r.desfasePago < -0.25
+              ? 'Cada cliente tarda de media menos en pagar que en el histórico.'
+              : 'Igual que en el histórico.',
+      )
+    const perdidos = (r: Resumen, detalle: boolean) =>
       bloque(
         'Clientes perdidos',
         String(r.perdidos),
         tono(r.perdidos > 0, false),
-        r.perdidos ? `${formatear(r.eurosPerdidos, 0)} € sin cobrar: se cansaron de esperar en caja.` : 'Nadie dejó la compra en la fila.',
-      ),
-      this.leyendaCalor(),
-      calor,
-    )
+        !detalle
+          ? `${formatear(r.eurosPerdidos, 0)} € sin cobrar`
+          : r.perdidos
+            ? `${formatear(r.eurosPerdidos, 0)} € sin cobrar: se cansaron de esperar en caja.`
+            : 'Nadie dejó la compra en la fila.',
+      )
+    const calor = boton(this.calor ? 'Ocultar mapa de calor' : 'Ver mapa de calor', 'secundario', () => {
+      this.calor = !this.calor
+      this.pintarResultado()
+      this.op.alCambiar()
+    }, Flame)
+
+    const rB = this.b.sim!.resumen()
+    if (!this.comparando) {
+      this.resultado.replaceChildren(
+        el('p', 'subtitulo', 'Resultado del día'),
+        eficiencia(rB, true),
+        perdidos(rB, true),
+        this.leyendaCalor(),
+        calor,
+      )
+      return
+    }
+    const rA = this.a.sim!.resumen()
+    const columnas = el('div', 'columnas-resultado')
+    const col = (letra: string, r: Resumen) => {
+      const c = el('div', 'columna-resultado')
+      c.append(el('p', 'subtitulo', letra), eficiencia(r, false), perdidos(r, false))
+      return c
+    }
+    columnas.append(col('A · versión A', rA), col('B · tienda actual', rB))
+    this.resultado.replaceChildren(el('p', 'subtitulo', 'Resultado del día'), columnas, this.diferencia(rA, rB), this.leyendaCalor(), calor)
+  }
+
+  /** La frase que resume la comparación: qué gana (o pierde) B frente a A. */
+  private diferencia(rA: Resumen, rB: Resumen) {
+    const dMin = rB.desfasePago - rA.desfasePago
+    const dPerdidos = rB.perdidos - rA.perdidos
+    const dEuros = rB.eurosPerdidos - rA.eurosPerdidos
+    const partes: string[] = []
+    if (Math.abs(dMin) >= 0.1) partes.push(`${formatear(Math.abs(dMin))} min ${dMin < 0 ? 'menos' : 'más'} por cliente`)
+    if (dPerdidos !== 0)
+      partes.push(
+        `${Math.abs(dPerdidos)} ${Math.abs(dPerdidos) === 1 ? 'cliente perdido' : 'clientes perdidos'} ${dPerdidos < 0 ? 'menos' : 'más'} (${formatear(Math.abs(dEuros), 0)} € ${dEuros < 0 ? 'más cobrados' : 'menos cobrados'})`,
+      )
+    const mejor = dMin < -0.1 || dPerdidos < 0
+    const peor = dMin > 0.1 || dPerdidos > 0
+    const p = el('p', `diferencia ${mejor && !peor ? 'bien' : peor && !mejor ? 'mal' : ''}`)
+    p.textContent = partes.length ? `B frente a A: ${partes.join(' y ')}.` : 'B y A funcionan igual con este día.'
+    return p
   }
 
   private leyendaCalor() {
@@ -340,57 +359,13 @@ export class ModoSimulacion {
     return l
   }
 
-  /**
-   * Mapa de calor: tiempo parado sin poder avanzar o esperando en fila en cada celda. Se difumina y se pinta
-   * en un lienzo de una celda por píxel que se escala suavizado: salen manchas, no cuadros.
-   * Las paradas para coger un producto no cuentan: si no, ardería cualquier estantería.
-   */
-  private dibujarCalor(sim: Simulacion, nav: Navegacion) {
-    const { ancho, alto } = nav
-    const v = Float32Array.from(sim.atascos)
-    difuminar(v, ancho, alto, 2)
-    difuminar(v, ancho, alto, 2)
-    // Escala con el percentil 95 de lo que tiene algo: un solo punto muy caliente no apaga el resto.
-    const valores = [...v].filter((x) => x > 0).sort((a, b) => a - b)
-    const tope = valores.length ? valores[Math.floor(valores.length * 0.95)] || valores[valores.length - 1] : 1
-
-    const lienzo = this.lienzoCalor
-    if (lienzo.width !== ancho || lienzo.height !== alto) {
-      lienzo.width = ancho
-      lienzo.height = alto
-      this.texturaCalor?.destroy(true)
-      this.texturaCalor = null
-    }
-    const ctx = lienzo.getContext('2d')!
-    const img = ctx.createImageData(ancho, alto)
-    for (let k = 0; k < v.length; k++) {
-      const t = Math.min(1, v[k] / tope)
-      if (t < 0.02) continue
-      // Suave al principio, para que lo poco apenas se vea y lo mucho destaque.
-      const a = t * t * (3 - 2 * t)
-      img.data[4 * k] = CALOR_BAJO[0] + (CALOR_ALTO[0] - CALOR_BAJO[0]) * a
-      img.data[4 * k + 1] = CALOR_BAJO[1] + (CALOR_ALTO[1] - CALOR_BAJO[1]) * a
-      img.data[4 * k + 2] = CALOR_BAJO[2] + (CALOR_ALTO[2] - CALOR_BAJO[2]) * a
-      img.data[4 * k + 3] = Math.round(255 * 0.78 * a)
-    }
-    ctx.putImageData(img, 0, 0)
-    if (!this.texturaCalor) {
-      this.texturaCalor = Texture.from(lienzo)
-      this.texturaCalor.source.scaleMode = 'linear'
-      this.spriteCalor.texture = this.texturaCalor
-    } else this.texturaCalor.source.update()
-    // Cada píxel es una celda de 50 cm, empezando en la primera celda de la rejilla.
-    this.spriteCalor.position.set(nav.i0 * 0.5, nav.j0 * 0.5)
-    this.spriteCalor.scale.set(0.5)
-  }
-
   /** Ajustes de la simulación: baños, probadores, cajas y trabajadores. Cambiar algo vuelve a empezar el día. */
   private construirAjustes() {
     const a = this.ajustes!
     const caja = el('details', 'ajustes-sim')
     caja.open = this.ajustesAbiertos
     caja.addEventListener('toggle', () => (this.ajustesAbiertos = caja.open))
-    caja.append(el('summary', '', 'Ajustes'))
+    caja.append(el('summary', '', this.comparando ? 'Ajustes (los mismos para A y B)' : 'Ajustes'))
     const numero = (texto: string, id: string, valor: number, min: number, max: number, alCambiar: (v: number) => void) => {
       const fila = el('div', 'campo')
       const label = el('label', '', texto)
@@ -425,35 +400,46 @@ export class ModoSimulacion {
       numero('Paciencia en caja (min)', 'aj-paciencia', a.pacienciaCaja, 1, 120, (v) => (a.pacienciaCaja = v)),
       el('p', 'subtitulo', 'Trabajadores por sección'),
     )
-    for (const area of this.plan.areas.filter((x) => x.tipo === 'seccion'))
+    for (const area of this.b.plan.areas.filter((x) => x.tipo === 'seccion'))
       caja.append(numero(area.nombre, `aj-t-${area.id}`, a.trabajadores[area.id] ?? 0, 0, 10, (v) => (a.trabajadores[area.id] = v)))
     return caja
   }
 
   private refrescar() {
-    const sim = this.sim
+    const sim = this.b.sim
     if (!sim) return
     this.reloj.textContent = hora(Math.min(sim.tiempo, sim.cierre + 3600))
-    const r = sim.resumen()
-    const fila = (nombre: string, valor: string) => {
-      const f = el('div', 'dato-sim')
-      f.append(el('span', '', nombre), el('strong', '', valor))
+    const rB = sim.resumen()
+    const rA = this.comparando ? this.a.sim?.resumen() : undefined
+    const fila = (nombre: string, valor: (r: Resumen) => string) => {
+      const f = el('div', rA ? 'dato-sim doble' : 'dato-sim')
+      f.append(el('span', '', nombre))
+      if (rA) f.append(el('strong', '', valor(rA)))
+      f.append(el('strong', '', valor(rB)))
       return f
     }
-    this.datos.replaceChildren(
-      fila('Dentro ahora', String(r.dentro)),
-      fila('Han comprado', String(r.hanComprado)),
-      fila('Han salido sin comprar', String(r.sinComprar)),
-      fila('Ventas', `${formatear(r.euros, 0)} €`),
-      fila('Tiempo medio en tienda', `${formatear(r.minutosMedios)} min`),
-      fila('Parados en atascos', `${formatear(r.minutosAtasco)} min de media`),
-      fila('Esperando en caja', `${formatear(r.minutosFila)} min de media`),
-      fila('En fila ahora', `${r.enFila.cajero} cajas · ${r.enFila.autopago} autopago`),
-    )
-    if (sim.enCola > 0) this.datos.append(fila('Esperando para entrar', String(sim.enCola)))
+    const filas = [
+      fila('Dentro ahora', (r) => String(r.dentro)),
+      fila('Han comprado', (r) => String(r.hanComprado)),
+      fila('Han salido sin comprar', (r) => String(r.sinComprar)),
+      fila('Ventas', (r) => `${formatear(r.euros, 0)} €`),
+      fila('Tiempo medio en tienda', (r) => `${formatear(r.minutosMedios)} min`),
+      fila('Parados en atascos', (r) => `${formatear(r.minutosAtasco)} min`),
+      fila('Esperando en caja', (r) => `${formatear(r.minutosFila)} min`),
+      fila('En fila ahora', (r) => `${r.enFila.cajero} + ${r.enFila.autopago}`),
+    ]
+    if (rA) {
+      const cabecera = el('div', 'dato-sim doble cabecera')
+      cabecera.append(el('span', ''), el('strong', '', 'A'), el('strong', '', 'B'))
+      filas.unshift(cabecera)
+    }
+    this.datos.replaceChildren(...filas)
+    if (sim.enCola > 0) this.datos.append(fila('Esperando para entrar', () => String(sim.enCola)))
+
     const avisos: string[] = []
-    if (r.sinSitio.length) avisos.push(`Sin sitio en la tienda: ${r.sinSitio.join(', ')}. Sus clientes se la saltan.`)
-    const fuera = this.nav!.sinSitioCajas
+    if (rB.sinSitio.length) avisos.push(`Sin sitio en la tienda: ${rB.sinSitio.join(', ')}. Sus clientes se la saltan.`)
+    if (rA?.sinSitio.length) avisos.push(`Sin sitio en la versión A: ${rA.sinSitio.join(', ')}.`)
+    const fuera = this.b.nav!.sinSitioCajas
     if (fuera.cajas || fuera.autopagos)
       avisos.push(`No caben en la zona de Cajas: ${fuera.cajas} cajas y ${fuera.autopagos} autopagos (cada caja ocupa 2 m de ancho y cada autopago 1 m).`)
     this.aviso.hidden = avisos.length === 0
