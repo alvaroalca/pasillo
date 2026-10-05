@@ -41,7 +41,7 @@ export async function cargarHistorico(url = 'historico.json'): Promise<Historico
 
 export function leerHistorico(texto: string): Historico {
   const h = JSON.parse(texto)
-  if (h?.formato !== 'planta-historico') throw new Error('El archivo no es un histórico de Planta.')
+  if (h?.formato !== 'planta-historico') throw new Error('El archivo no es un histórico de Pasillo.')
   return { secciones: h.secciones, apertura: aMinutos(h.apertura), cierre: aMinutos(h.cierre), dias: h.dias }
 }
 

@@ -83,7 +83,7 @@ export class Interfaz {
     this.botonRehacer.title = 'Rehacer (Ctrl+Y)'
     this.botonRehacer.ariaLabel = 'Rehacer'
     this.botonModo = boton('Simular', 'modo', () => acciones.simular(), Play)
-    this.barra.append(hamburguesa, el('span', 'marca', 'Planta'), this.botonDeshacer, this.botonRehacer, this.botonModo, this.menu)
+    this.barra.append(hamburguesa, el('span', 'marca', 'Pasillo'), this.botonDeshacer, this.botonRehacer, this.botonModo, this.menu)
 
     this.panel.append(this.cuerpo, el('p', 'subtitulo separado', 'Capas'), this.capasEl)
     this.estado.append(this.pista, el('span', 'suave', 'Rueda: zoom · Clic derecho: mover la vista'))

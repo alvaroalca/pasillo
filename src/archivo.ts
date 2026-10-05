@@ -100,7 +100,7 @@ function tramos(celdas: Map<string, number>): [number, number, number, number][]
   return salida
 }
 
-/** Lanza un Error con un mensaje legible si el archivo no es una tienda de Planta. */
+/** Lanza un Error con un mensaje legible si el archivo no es una tienda de Pasillo. */
 export function deserializar(texto: string): Plan {
   let g: Guardado
   try {
@@ -108,8 +108,8 @@ export function deserializar(texto: string): Plan {
   } catch {
     throw new Error('El archivo no es un JSON válido.')
   }
-  if (g?.formato !== FORMATO) throw new Error('El archivo no es una tienda de Planta.')
-  if (g.version > VERSION) throw new Error('El archivo es de una versión más nueva de Planta.')
+  if (g?.formato !== FORMATO) throw new Error('El archivo no es una tienda de Pasillo.')
+  if (g.version > VERSION) throw new Error('El archivo es de una versión más nueva de Pasillo.')
 
   const plan = planVacio()
   // Los archivos de antes de las capas no las traen: se quedan las de por defecto.

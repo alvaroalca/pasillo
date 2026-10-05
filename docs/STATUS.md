@@ -18,6 +18,8 @@
 
 **Vídeo de presentación (borrador, 05/10)**: vive en `C:\Mis Proyectos\promo-videos\planta` (no es repo git, como sus hermanos). Rama METRAJE, 45,3 s, 1920x1080: título, editor (se dibujan y pintan tres góndolas), tienda en marcha a ×2 con el reloj y las cifras del sábado 2/08 (2.021 tickets, 5.745 visitas, 80.272 €), carrusel de cinco distribuciones (en L, rejilla, árbol, islas, libre; tiendas en `tiendas/`) y A/B (demo frente a Agua apretada en un pasillo y una expo en el transversal: ×2,7 horas paradas, 12 h frente a 32 h). Grabado con `capture.cjs` a 1920x1080 (desfase medido: el vídeo va 0,5 s por delante de las marcas), cortado con `scripts/cortar.mjs`, cifras estampadas con `scripts/datos.mjs`, `check` limpio, render en `renders/` y `renders/promo.mp4` comprimido (1,8 MB). Álvaro vio el borrador y tiene correcciones pendientes ("hay cosas raras"): empezar por ellas en la sesión siguiente.
 
+**Correcciones al borrador del vídeo (05/10, hechas)**: la app se llama Pasillo de cara afuera (barra, título, mensajes; metraje regrabado). Rótulos para gente de fuera del oficio: «Sección Agua», no «Agua». La escena 3 dice que los tickets salen de la base de datos de tu empresa y que cada sección y cada pasillo tienen su afluencia (la de los pasillos sale de la simulación: la app no la cuenta). Render nuevo en `renders/promo.mp4`.
+
 **Arreglos que salieron al grabar el vídeo (hechos)**: cambiar de herramienta quita la selección (si no, el panel seguía enseñándola y la herramienta parecía no cambiar; lo vio Álvaro); `[hidden]` gana a cualquier `display` (la barra de estado no se escondía al simular); en la comparación los dos mapas de calor comparten escala (la mayor de las dos; antes cada uno se escalaba solo y se veían igual de rojos); el encuadre deja la tienda entre la barra de herramientas y el panel; el resultado da las horas paradas en atascos y la frase de diferencia las compara ("2,7 veces más tiempo parado en atascos").
 
 **Tienda demo (definitiva, retocada por Álvaro)**: `public/demo.json`. Concepto de Álvaro: se entra por una esquina (abajo a la derecha), se recorre la tienda hasta el centro y del centro se baja a cajas (abajo, en el centro). Sala de 60 × 42 m en L con anexo de zona privada y baños; pasillos perpendiculares a la fachada en dos tramos con cabeceras, pasillo transversal con cubos, expos grandes de Ciclismo (arriba a la derecha) y Agua (zona abierta) con dos cubos de Agua; probadores junto a cajas. Lo que más factura, lo más lejos de la entrada (Fitness al fondo a la izquierda); Naturaleza, en la esquina con menos paso. El lineal sigue el orden de facturación que dio Álvaro: Fitness 115 m, Montaña 99, Colectivos 88, Agua 79, Ciclismo 74, Running 72, Raqueta 50, Naturaleza 25. Se abre sola si el navegador no tiene tienda guardada y desde el menú (Abrir tienda demo).
@@ -27,8 +29,8 @@ Antes, ya probado: contorno con escala, puertas, góndolas con lineal útil, sec
 ## Siguiente
 
 - Corregir lo que Álvaro vea raro en el borrador del vídeo (lo dirá al empezar la sesión).
-- Decidir el cierre del vídeo: dice "Pruébalo en alvaroalcaraz.com/planta" y Planta aún no está publicada (publicarla en el portfolio con su ficha, o cambiar la frase).
-- Después: subir a GitHub y ficha en el portfolio.
+- Decidir el cierre del vídeo: dice "Pruébalo en alvaroalcaraz.com/pasillo" y aún no está publicada (publicarla en el portfolio con su ficha, o cambiar la frase).
+- Después: subir a GitHub (repo `pasillo`) y ficha en el portfolio. En la ficha, secciones como «sección Agua».
 
 
 ## Conocido

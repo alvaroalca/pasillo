@@ -1,8 +1,8 @@
-# CLAUDE.md: Planta
+# CLAUDE.md: Pasillo
 
 Editor y simulador de tiendas en el navegador. El usuario dibuja la planta de su tienda (contorno, puertas, góndolas, secciones), le da sus datos de venta y ve a los clientes moverse por ella como puntos. Sirve para comparar distribuciones: la tienda A contra la B con el mismo modelo, nunca como predicción absoluta.
 
-Pieza de portfolio. Nace de cuatro años de Álvaro en Decathlon. Se publicará en `alvaroalcaraz.com/planta/`. Estado vivo en `docs/STATUS.md`.
+Pieza de portfolio. Nace de cuatro años de Álvaro en Decathlon. Nombre público **Pasillo** (repo de GitHub, portfolio y la propia app); la carpeta y los identificadores internos (`formato: 'planta'`, claves `planta:` del navegador) se quedan como están para no romper archivos guardados. Se publicará en `alvaroalcaraz.com/pasillo/`. Estado vivo en `docs/STATUS.md`.
 
 ## Stack
 
