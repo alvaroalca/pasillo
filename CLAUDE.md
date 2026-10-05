@@ -26,16 +26,18 @@ Pieza de portfolio. Nace de cuatro años de Álvaro en Decathlon. Se publicará 
 - La medida de una sección es su **lineal** (metros de tramo pintado con suelo libre delante, más 1 m por cabecera) y sus cubos y expos, no m² de suelo.
 - Una sección puede tener varias manchas sueltas (ciclismo al fondo y un cubo de ciclismo en la entrada). El cliente elige destino según el lineal de cada mancha; cubos y expos atraen por su cuenta.
 
-**Datos de entrada** (lo que da la app de tienda de Decathlon: tienda > sección > familia > subfamilia > producto, por hora, en € o unidades)
-- Por sección: ventas por hora y cesta media, en la misma unidad (€ o unidades, da igual: la cuenta es la misma).
-- Por tienda: ventas por hora, cesta media, frecuentación por hora (contador de la puerta antirrobo) y cajeros por hora.
-- La tienda demo trae números inventados y creíbles, sin datos ni marca de Decathlon. La app se abre ya funcionando.
+**Datos: un histórico de tickets** (decidido el 2026-10-05; sustituye a los datos agregados por sección y hora)
+- La simulación reproduce un día real del histórico: mismos clientes, mismas cestas, a la misma hora. Lo único que cambia entre dos simulaciones es la colocación, y por eso se pueden comparar (el vídeo enseñará dos colocaciones del lineal con los mismos datos).
+- Se guarda cada ticket: hora de pago y líneas (sección, unidades, importe). Lo agregado (ventas por sección y hora, picos, cesta media) sale sumando tickets. El ticket dice además qué secciones visitó cada cliente, que es lo que cruza la tienda y crea atascos. Más el contador de la puerta por hora (frecuentación).
+- `public/historico.json`, inventado con `scripts/generar-historico.ts` (semilla fija, reproducible). La app lo lee a través de una interfaz de histórico, para poder cambiarlo por una base de datos real sin tocar la simulación. Las secciones del histórico se casan con las del plano por nombre.
+- Cifras de partida (Álvaro, Decathlon de costa de 2.000 m² en Ondara): 8 M€ al año, unos 4 M€ en verano y 1-2 M€ en Navidad; resto del año ~10.600 €/día. Ticket medio ~38 €, entran ~3 por cada uno que compra, abre de 10 a 22. Orden de facturación: Fitness, Montaña, Deportes colectivos, Agua, Ciclismo, Running, Raqueta, Naturaleza. Periodos: 28/07-10/08/2025 (verano, Agua arriba) y 12/01-25/01/2026 (rebajas, Fitness y Montaña arriba).
+- Sin datos ni marca de Decathlon. La app se abre ya funcionando con la tienda demo y su histórico.
 
 **Modelo**
-- Compradores de la sección por hora = ventas ÷ cesta media. Igual para la tienda.
-- Secciones por comprador = suma de compradores de sección ÷ compradores de tienda.
-- Visitantes = frecuentación; los que no compran pasean con los mismos pesos y no pasan por caja.
-- La venta se registra en caja: la entrada del cliente se adelanta para que los picos no salgan corridos.
+- Cada ticket es un cliente que compra. Su hora de entrada sale de la hora de pago con una fórmula fija que no depende de la colocación (minutos base + por sección + por unidad). Lo que cambia con la colocación es lo de dentro: camino, tiempo y atascos.
+- Los que no compran: frecuentación de la hora menos tickets de la hora. Rondan las secciones que más venden a esa hora y salen sin pasar por caja.
+- Dentro de una sección, el cliente se pasea entre sus puntos de compra, más rato cuantas más unidades compra. Va siempre a la más cercana de las secciones que le faltan.
+- Más adelante (Álvaro): el cliente que lleva mucho rato parado se "pierde" (abandona) y un trabajador libre cerca lo "acelera".
 - Movimiento: un mapa de distancias por sección (un recorrido de la rejilla desde cada una); los clientes bajan hacia su destino. Coste independiente del número de clientes. Cerrar un pasillo = bloquear celdas y recalcular los mapas.
 - Muros y puertas en la simulación: un paso entre dos celdas está cerrado si lo corta un muro, salvo que en ese punto haya una puerta (hoy `muroEntre` no mira puertas: arreglarlo al empezar la fase 2).
 - Sentido de las puertas con dos mapas de caminos: mientras compra, las puertas de Salida están cerradas; al irse (tras cajas), las de Entrada. Interior, en los dos sentidos. Emergencia, cerrada salvo evacuación. Así un recibidor con puerta exterior e interior funciona sin más (decidido el 2026-10-05 a raíz del recibidor de Álvaro).
@@ -62,8 +64,8 @@ Pieza de portfolio. Nace de cuatro años de Álvaro en Decathlon. Se publicará 
 ## Fases
 
 1. Editor: contorno con escala, puertas, góndolas, zonas y secciones. Guardar y cargar JSON.
-2. Simulación sencilla: entran, visitan 1-3 secciones al azar, pagan y salen esquivando góndolas.
-3. Datos reales: curvas por hora, pesos, cajeros, colas, línea de tiempo.
+2. Simulación sobre el histórico: los tickets de un día entran, compran en sus secciones esquivando el mueble, pagan y salen; los que no compran rondan. Play, pausa y velocidad.
+3. Cajas una a una y sus colas, línea de tiempo para moverse por el día, abandono de clientes.
 4. Eventos (cierres, trabajadores como puntos rojos), mapa de calor, comparación A/B.
 
 ## Cómo trabajar aquí

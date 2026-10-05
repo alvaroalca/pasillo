@@ -1,7 +1,7 @@
-import { Eye, EyeOff, Lock, LockOpen, Menu, Redo2, Undo2 } from 'lucide'
+import { Eye, EyeOff, Lock, LockOpen, Menu, Pencil, Play, Redo2, Undo2 } from 'lucide'
 import type { Edicion } from './edicion'
 import { superficie } from './geometria'
-import { boton, el, formatear, lista, type Herramienta } from './herramienta'
+import { boton, el, formatear, icono, lista, type Herramienta } from './herramienta'
 import type { Historial } from './historial'
 import { CAPAS, metrosLineal, NOMBRE_CAPA, type Plan } from './plan'
 
@@ -16,6 +16,8 @@ export interface Acciones {
   escalar(m2: number): void
   /** Se ha tocado una capa (ojo o candado). */
   capas(): void
+  /** Pasar del editor a la simulación o al revés. */
+  simular(): void
 }
 
 /**
@@ -27,6 +29,7 @@ export class Interfaz {
   private menu = el('div', 'menu')
   private botonDeshacer: HTMLButtonElement
   private botonRehacer: HTMLButtonElement
+  private botonModo: HTMLButtonElement
   private herramientasEl = el('nav', 'herramientas')
   private panel = el('aside', 'panel')
   private cuerpo = el('div', 'propiedades')
@@ -74,14 +77,23 @@ export class Interfaz {
     this.botonRehacer = boton('', 'icono', () => acciones.rehacer(), Redo2)
     this.botonRehacer.title = 'Rehacer (Ctrl+Y)'
     this.botonRehacer.ariaLabel = 'Rehacer'
-    this.barra.append(hamburguesa, el('span', 'marca', 'Planta'), this.botonDeshacer, this.botonRehacer, this.menu)
+    this.botonModo = boton('Simular', 'modo', () => acciones.simular(), Play)
+    this.barra.append(hamburguesa, el('span', 'marca', 'Planta'), this.botonDeshacer, this.botonRehacer, this.botonModo, this.menu)
 
     this.panel.append(this.cuerpo, el('p', 'subtitulo separado', 'Capas'), this.capasEl)
     this.estado.append(this.pista, el('span', 'suave', 'Rueda: zoom · Clic derecho: mover la vista'))
   }
 
-  montar() {
-    document.body.append(this.barra, this.herramientasEl, this.panel, this.estado)
+  montar(...extra: HTMLElement[]) {
+    document.body.append(this.barra, this.herramientasEl, this.panel, this.estado, ...extra)
+  }
+
+  /** En simulación se esconde todo lo del editor y el botón pasa a "Editar". */
+  modoSimulacion(simulando: boolean) {
+    document.body.classList.toggle('simulando', simulando)
+    this.botonModo.replaceChildren(icono(simulando ? Pencil : Play, 16), simulando ? 'Editar' : 'Simular')
+    this.botonModo.title = simulando ? 'Volver al editor' : 'Ver la tienda en marcha con un día del histórico'
+    this.estado.hidden = simulando
   }
 
   /** Fuerza a reconstruirlo todo en el próximo `actualizar` (tras cargar o deshacer). */

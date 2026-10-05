@@ -15,6 +15,7 @@ import { HerramientaPuerta } from './herramienta-puerta'
 import { HerramientaSeleccionar } from './herramienta-seleccionar'
 import { Historial } from './historial'
 import { Interfaz } from './interfaz'
+import { ModoSimulacion } from './modo-simulacion'
 import { escalarPlan, planVacio, type Capa, type Plan } from './plan'
 import { Plano } from './plano'
 import { dibujarRejilla } from './rejilla'
@@ -70,7 +71,9 @@ const herramientas: Herramienta[] = [
 ]
 const herramienta = (id: Herramienta['id']) => herramientas.find((h) => h.id === id)!
 let activa = herramienta(plan.contorno ? 'seleccionar' : 'muro')
-app.stage.addChild(rejilla, plano.vista, ...herramientas.map((h) => h.vista), edicion.vista)
+const simulacion = new ModoSimulacion(plan, () => pedirDibujo())
+let simulando = false
+app.stage.addChild(rejilla, plano.vista, simulacion.vista, ...herramientas.map((h) => h.vista), edicion.vista)
 
 function elegir(h: Herramienta) {
   if (h === activa || (h.necesitaContorno && !plan.contorno)) return
@@ -140,6 +143,21 @@ const interfaz = new Interfaz(herramientas, plan, edicion, historial, {
     historial.confirmar(plan)
     encuadrar()
   },
+  simular: async () => {
+    if (simulando) {
+      simulacion.salir()
+      simulando = false
+    } else {
+      activa.salir()
+      edicion.seleccion = []
+      edicion.sobre = null
+      const problema = await simulacion.entrar()
+      if (problema) return alert(problema)
+      simulando = true
+    }
+    interfaz.modoSimulacion(simulando)
+    pedirDibujo()
+  },
   capas: () => {
     // Lo que queda oculto no puede seguir seleccionado.
     const capa = (e: Elemento): Capa => (e.tipo === 'puerta' ? 'puertas' : e.tipo === 'muro' ? 'muros' : 'gondolas')
@@ -147,7 +165,7 @@ const interfaz = new Interfaz(herramientas, plan, edicion, historial, {
     pedirDibujo()
   },
 })
-interfaz.montar()
+interfaz.montar(simulacion.panel)
 
 // Se repinta solo cuando algo cambia, una vez por frame como mucho.
 let pendiente = false
@@ -158,6 +176,15 @@ function pedirDibujo() {
     pendiente = false
     dibujarRejilla(rejilla, cam, window.innerWidth, window.innerHeight)
     plano.dibujar()
+    if (simulando) {
+      // Simulando no se edita: fuera herramientas y selección, dentro los clientes.
+      for (const h of herramientas) h.vista.visible = false
+      edicion.vista.visible = false
+      simulacion.dibujar(cam)
+      lienzo.style.cursor = moviendo ? 'grabbing' : 'grab'
+      return
+    }
+    edicion.vista.visible = true
     for (const h of herramientas) {
       h.vista.visible = h === activa
       if (h === activa) h.dibujar()
@@ -192,7 +219,8 @@ lienzo.addEventListener('contextmenu', (e) => e.preventDefault())
 
 lienzo.addEventListener('pointerdown', (e) => {
   lienzo.setPointerCapture(e.pointerId)
-  if (e.button === 1 || e.button === 2 || (e.button === 0 && espacio)) {
+  // Simulando, el clic izquierdo también arrastra la vista: no hay nada que editar.
+  if (e.button === 1 || e.button === 2 || (e.button === 0 && (espacio || simulando))) {
     moviendo = true
     ultimo = { x: e.offsetX, y: e.offsetY }
   } else if (e.button === 0) {
@@ -226,6 +254,7 @@ function modsDe(e: MouseEvent | KeyboardEvent): Mods {
 
 /** El ratón está en `pantalla` (o la vista se ha movido bajo él): a quién le toca. */
 function apuntar(pantalla: { x: number; y: number }, mods: Mods) {
+  if (simulando) return
   const raton = cam.aMundo(pantalla.x, pantalla.y)
   if (pulsadoEn === 'edicion') {
     edicion.mover(raton, mods)
@@ -254,6 +283,7 @@ lienzo.addEventListener('pointerup', () => {
 
 // Doble clic: termina el muro que se está dibujando o, sobre un muro, le añade una esquina.
 lienzo.addEventListener('dblclick', (e) => {
+  if (simulando) return
   if (activa.dobleClic?.()) {
     pedirDibujo()
     return
@@ -318,6 +348,7 @@ window.addEventListener('keydown', (e) => {
   }
   // Alt suelto enfoca la barra de menús en algunos navegadores; aquí sirve para duplicar.
   if (e.key === 'Alt') e.preventDefault()
+  if (simulando) return
 
   if (activa.tecla(e) || teclaGeneral(e)) {
     e.preventDefault()

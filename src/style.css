@@ -9,6 +9,7 @@
   --emergencia: #e8a317;
   --error: #e5484d;
   --bloqueado: #9aa5ae;
+  --cliente: #2a9d5c;
   font-family: Nunito, sans-serif;
   color: var(--muro);
 }
@@ -484,4 +485,91 @@ button.icono.activa {
 .campo select:focus {
   outline: 2px solid var(--acento);
   outline-offset: -1px;
+}
+
+/* Botón Simular / Editar de la barra superior. */
+.barra button.modo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 6px;
+  padding: 7px 12px;
+  background: var(--cliente);
+  color: #fff;
+  font-weight: 800;
+}
+
+.barra button.modo:hover {
+  filter: brightness(0.92);
+}
+
+/* Simulando: fuera lo del editor, dentro el panel de la simulación. */
+.panel-sim,
+body.simulando .herramientas,
+body.simulando .panel:not(.panel-sim) {
+  display: none;
+}
+
+body.simulando .panel-sim {
+  display: block;
+}
+
+.reloj {
+  margin: 4px 0 10px;
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.controles-sim {
+  margin-bottom: 12px;
+}
+
+.controles-sim .primario {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  justify-content: center;
+  background: var(--cliente);
+}
+
+.datos-sim {
+  display: grid;
+  gap: 4px;
+  margin: 12px 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--borde);
+}
+
+.dato-sim {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.dato-sim span {
+  color: var(--texto-suave);
+}
+
+.dato-sim strong {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.ajustes-sim {
+  margin: 12px 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--borde);
+}
+
+.ajustes-sim summary {
+  font-weight: 800;
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+
+.ajustes-sim .subtitulo {
+  margin-top: 10px;
 }
