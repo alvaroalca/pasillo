@@ -171,8 +171,10 @@ export class ModoSimulacion {
 
   /** Pinta cada tienda con su cámara: A a la izquierda y B a la derecha cuando se compara. */
   dibujar(camA: Camara, camB: Camara) {
-    this.b.dibujar(camB, this.calor)
-    if (this.comparando) this.a.dibujar(camA, this.calor)
+    // Al comparar, una sola escala de calor para las dos (la mayor): así se comparan de verdad.
+    const tope = this.calor && this.comparando ? Math.max(this.a.escalaCalor(), this.b.escalaCalor()) : 0
+    this.b.dibujar(camB, this.calor, tope)
+    if (this.comparando) this.a.dibujar(camA, this.calor, tope)
     this.refrescar()
   }
 
@@ -306,6 +308,13 @@ export class ModoSimulacion {
             ? `${formatear(r.eurosPerdidos, 0)} € sin cobrar: se cansaron de esperar en caja.`
             : 'Nadie dejó la compra en la fila.',
       )
+    const atascos = (r: Resumen, detalle: boolean) =>
+      bloque(
+        'Parados en atascos',
+        `${formatear(r.horasAtasco, 0)} h`,
+        '',
+        detalle ? `Entre todos los clientes del día: ${formatear(r.minutosAtasco)} min por cliente que compra.` : `${formatear(r.minutosAtasco)} min por cliente`,
+      )
     const calor = boton(this.calor ? 'Ocultar mapa de calor' : 'Ver mapa de calor', 'secundario', () => {
       this.calor = !this.calor
       this.pintarResultado()
@@ -318,6 +327,7 @@ export class ModoSimulacion {
         el('p', 'subtitulo', 'Resultado del día'),
         eficiencia(rB, true),
         perdidos(rB, true),
+        atascos(rB, true),
         this.leyendaCalor(),
         calor,
       )
@@ -327,7 +337,7 @@ export class ModoSimulacion {
     const columnas = el('div', 'columnas-resultado')
     const col = (letra: string, r: Resumen) => {
       const c = el('div', 'columna-resultado')
-      c.append(el('p', 'subtitulo', letra), eficiencia(r, false), perdidos(r, false))
+      c.append(el('p', 'subtitulo', letra), eficiencia(r, false), perdidos(r, false), atascos(r, false))
       return c
     }
     columnas.append(col('A · versión A', rA), col('B · tienda actual', rB))
@@ -340,13 +350,17 @@ export class ModoSimulacion {
     const dPerdidos = rB.perdidos - rA.perdidos
     const dEuros = rB.eurosPerdidos - rA.eurosPerdidos
     const partes: string[] = []
+    // Atascos: como proporción, que es como se entiende ("el doble", "4 veces").
+    const veces = rA.horasAtasco > 0 ? rB.horasAtasco / rA.horasAtasco : 1
+    if (veces >= 1.5) partes.push(`${formatear(veces)} veces más tiempo parado en atascos`)
+    else if (veces <= 1 / 1.5 && rB.horasAtasco > 0) partes.push(`${formatear(1 / veces)} veces menos tiempo parado en atascos`)
     if (Math.abs(dMin) >= 0.1) partes.push(`${formatear(Math.abs(dMin))} min ${dMin < 0 ? 'menos' : 'más'} por cliente`)
     if (dPerdidos !== 0)
       partes.push(
         `${Math.abs(dPerdidos)} ${Math.abs(dPerdidos) === 1 ? 'cliente perdido' : 'clientes perdidos'} ${dPerdidos < 0 ? 'menos' : 'más'} (${formatear(Math.abs(dEuros), 0)} € ${dEuros < 0 ? 'más cobrados' : 'menos cobrados'})`,
       )
-    const mejor = dMin < -0.1 || dPerdidos < 0
-    const peor = dMin > 0.1 || dPerdidos > 0
+    const mejor = dMin < -0.1 || dPerdidos < 0 || veces <= 1 / 1.5
+    const peor = dMin > 0.1 || dPerdidos > 0 || veces >= 1.5
     const p = el('p', `diferencia ${mejor && !peor ? 'bien' : peor && !mejor ? 'mal' : ''}`)
     p.textContent = partes.length ? `B frente a A: ${partes.join(' y ')}.` : 'B y A funcionan igual con este día.'
     return p

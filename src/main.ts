@@ -116,6 +116,7 @@ document.body.append(rotuloA, rotuloB)
 
 /** Ancho de la zona de la tienda a la izquierda del panel de la simulación, y dónde se parte en dos. */
 const PANEL = 330
+const BARRA = 80
 const mitad = () => (window.innerWidth - PANEL) / 2
 const partida = () => simulando && comparando
 
@@ -131,6 +132,9 @@ function elegir(h: Herramienta) {
   activa.salir()
   activa = h
   edicion.sobre = null
+  // El panel enseña primero lo seleccionado: si se quedara, la herramienta nueva no enseñaría lo suyo
+  // (el pincel, sus secciones) y parecería que no ha cambiado. Con Seleccionar sí se conserva.
+  if (h.id !== 'seleccionar') edicion.seleccion = []
   pedirDibujo()
 }
 
@@ -138,9 +142,14 @@ function encuadrar() {
   if (partida()) {
     // Las dos tiendas en su mitad, a la misma escala: la caja que abarca a las dos, en media pantalla.
     const puntos = [...(plan.contorno ?? []), ...(planA.contorno ?? [])]
-    if (puntos.length) cam.encuadrar(caja(puntos), mitad(), window.innerHeight)
+    if (puntos.length) cam.encuadrar(caja(puntos), mitad(), window.innerHeight, 0, 0.06)
     cam.x += mitad()
-  } else if (plan.contorno) cam.encuadrar(caja(plan.contorno), window.innerWidth, window.innerHeight)
+  } else if (plan.contorno) {
+    // La tienda entera a la vista, sin quedar debajo de los paneles: el de la derecha siempre y,
+    // en el editor, también la barra de herramientas de la izquierda.
+    const izquierda = simulando ? 0 : BARRA
+    cam.encuadrar(caja(plan.contorno), window.innerWidth - izquierda - PANEL, window.innerHeight, izquierda, 0.08)
+  }
   pedirDibujo()
 }
 

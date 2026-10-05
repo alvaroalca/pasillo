@@ -131,6 +131,8 @@ export interface Resumen {
   minutosMedios: number
   /** Minutos de media parados por atascos. */
   minutosAtasco: number
+  /** Horas que han pasado parados en atascos (sin contar la fila de caja) todos los que ya se han ido. */
+  horasAtasco: number
   /** Minutos de media entre la hora de pago del histórico y la de la simulación (+ = más tarde). */
   desfasePago: number
   /** Minutos de media esperando en la fila de cajas. */
@@ -753,6 +755,7 @@ export class Simulacion {
     let salidos = 0
     let desfase = 0
     let fila = 0
+    let horasAtasco = 0
     let perdidos = 0
     let eurosPerdidos = 0
     for (const c of this.clientes) {
@@ -760,6 +763,7 @@ export class Simulacion {
         perdidos++
         eurosPerdidos += c.euros
       }
+      if (c.fase === 'ido') horasAtasco += c.esperaTotal / 3600
       if (c.fase !== 'ido') dentro++
       else if (c.compra && !c.perdido) {
         hanComprado++
@@ -779,6 +783,7 @@ export class Simulacion {
       euros,
       minutosMedios: salidos ? minutos / salidos : 0,
       minutosAtasco: salidos ? atasco / salidos : 0,
+      horasAtasco,
       desfasePago: salidos ? desfase / salidos : 0,
       minutosFila: salidos ? fila / salidos : 0,
       enFila: { cajero: this.filas.cajero.length, autopago: this.filas.autopago.length },

@@ -16,13 +16,19 @@
 
 **Comparar colocaciones (hecho y probado)**: menú ☰ → "Fijar como versión A" (foto de la tienda, guardada en el navegador) o "Abrir archivo como versión A". En Simular, "Comparar con la versión A" parte la pantalla: A a la izquierda, B (la tienda actual) a la derecha, con su rótulo; misma cámara desplazada, mismo día, ajustes y reloj (los trabajadores de A se casan por nombre de sección). Datos en dos columnas y Resultado de cada una con la frase de diferencia "B frente a A". Código: `corrida.ts` (una tienda simulando) y `modo-simulacion.ts` (lo común). En Node, demo contra Agua↔Fitness intercambiadas (4+2 cajas): casi iguales (+3,1 min las dos; 121 frente a 76 perdidos): en la demo pesa más la cola que la colocación; para el vídeo hay que buscar un cambio que se note.
 
+**Vídeo de presentación (borrador, 05/10)**: vive en `C:\Mis Proyectos\promo-videos\planta` (no es repo git, como sus hermanos). Rama METRAJE, 45,3 s, 1920x1080: título, editor (se dibujan y pintan tres góndolas), tienda en marcha a ×2 con el reloj y las cifras del sábado 2/08 (2.021 tickets, 5.745 visitas, 80.272 €), carrusel de cinco distribuciones (en L, rejilla, árbol, islas, libre; tiendas en `tiendas/`) y A/B (demo frente a Agua apretada en un pasillo y una expo en el transversal: ×2,7 horas paradas, 12 h frente a 32 h). Grabado con `capture.cjs` a 1920x1080 (desfase medido: el vídeo va 0,5 s por delante de las marcas), cortado con `scripts/cortar.mjs`, cifras estampadas con `scripts/datos.mjs`, `check` limpio, render en `renders/` y `renders/promo.mp4` comprimido (1,8 MB). Álvaro vio el borrador y tiene correcciones pendientes ("hay cosas raras"): empezar por ellas en la sesión siguiente.
+
+**Arreglos que salieron al grabar el vídeo (hechos)**: cambiar de herramienta quita la selección (si no, el panel seguía enseñándola y la herramienta parecía no cambiar; lo vio Álvaro); `[hidden]` gana a cualquier `display` (la barra de estado no se escondía al simular); en la comparación los dos mapas de calor comparten escala (la mayor de las dos; antes cada uno se escalaba solo y se veían igual de rojos); el encuadre deja la tienda entre la barra de herramientas y el panel; el resultado da las horas paradas en atascos y la frase de diferencia las compara ("2,7 veces más tiempo parado en atascos").
+
 **Tienda demo (definitiva, retocada por Álvaro)**: `public/demo.json`. Concepto de Álvaro: se entra por una esquina (abajo a la derecha), se recorre la tienda hasta el centro y del centro se baja a cajas (abajo, en el centro). Sala de 60 × 42 m en L con anexo de zona privada y baños; pasillos perpendiculares a la fachada en dos tramos con cabeceras, pasillo transversal con cubos, expos grandes de Ciclismo (arriba a la derecha) y Agua (zona abierta) con dos cubos de Agua; probadores junto a cajas. Lo que más factura, lo más lejos de la entrada (Fitness al fondo a la izquierda); Naturaleza, en la esquina con menos paso. El lineal sigue el orden de facturación que dio Álvaro: Fitness 115 m, Montaña 99, Colectivos 88, Agua 79, Ciclismo 74, Running 72, Raqueta 50, Naturaleza 25. Se abre sola si el navegador no tiene tienda guardada y desde el menú (Abrir tienda demo).
 
 Antes, ya probado: contorno con escala, puertas, góndolas con lineal útil, secciones y zonas pintadas, guardar y cargar (autoguardado + `.json`).
 
 ## Siguiente
 
-- Vídeo (más de 30 s). Ideas de Álvaro: un tramo con la tienda funcionando a ×1 o ×2, el reloj corriendo y un rótulo tipo "Simula el día a día de tu tienda y optimízalo". Después, la comparación A/B.
+- Corregir lo que Álvaro vea raro en el borrador del vídeo (lo dirá al empezar la sesión).
+- Decidir el cierre del vídeo: dice "Pruébalo en alvaroalcaraz.com/planta" y Planta aún no está publicada (publicarla en el portfolio con su ficha, o cambiar la frase).
+- Después: subir a GitHub y ficha en el portfolio.
 
 
 ## Conocido
@@ -32,3 +38,5 @@ Antes, ya probado: contorno con escala, puertas, góndolas con lineal útil, sec
 - Pintura, lineal y manchas se recalculan enteros en cada cambio: ~7 ms en una tienda de 4.000 m² pintada entera (medido en Node). Si se nota al pintar, hacerlo incremental.
 - Varias acciones seguidas en menos de 400 ms se deshacen juntas (la foto se toma tras una pausa o al soltar el ratón).
 - No se pueden quitar esquinas sueltas (solo añadir con doble clic).
+- Con la demanda real del histórico, la colocación cambia poco los resultados (pasillos de 3 m, clientes que se reparten); lo que más se nota es estrechar el paso (una expo en un pasillo). Medido el 05/10 con varios escenarios.
+- Cerca del límite de las cajas, comparar con un solo día hace ruido: un cambio pequeño en el orden de llegada a la fila dispara o ahorra decenas de clientes perdidos (Agua apretada salió "mejor" que la demo con 4+2 cajas). Para comparar en serio habría que promediar varios días.

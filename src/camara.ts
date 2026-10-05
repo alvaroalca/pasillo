@@ -27,12 +27,12 @@ export class Camara {
     this.y = sy - antes.y * this.zoom
   }
 
-  encuadrar(c: { minX: number; minY: number; maxX: number; maxY: number }, ancho: number, alto: number) {
-    const margen = 0.15
+  /** Encaja la caja `c` en el rectángulo de pantalla que empieza en `x0` y mide `ancho` x `alto`. */
+  encuadrar(c: { minX: number; minY: number; maxX: number; maxY: number }, ancho: number, alto: number, x0 = 0, margen = 0.15) {
     const zx = (ancho * (1 - 2 * margen)) / Math.max(1, c.maxX - c.minX)
     const zy = (alto * (1 - 2 * margen)) / Math.max(1, c.maxY - c.minY)
     this.zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.min(zx, zy)))
-    this.x = ancho / 2 - ((c.minX + c.maxX) / 2) * this.zoom
+    this.x = x0 + ancho / 2 - ((c.minX + c.maxX) / 2) * this.zoom
     this.y = alto / 2 - ((c.minY + c.maxY) / 2) * this.zoom
   }
 

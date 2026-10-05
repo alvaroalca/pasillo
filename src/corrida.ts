@@ -53,6 +53,8 @@ export class Corrida {
   private lienzoCalor = document.createElement('canvas')
   private texturaCalor: Texture | null = null
   private spriteCalor = new Sprite()
+  /** Calor difuminado del último cálculo, para no difuminar dos veces en el mismo fotograma. */
+  private calor: Float32Array | null = null
 
   constructor(plan: Plan) {
     this.plan = plan
@@ -81,8 +83,25 @@ export class Corrida {
     this.spriteCalor.visible = false
   }
 
-  /** Pinta clientes, personal, cajas y (si toca) el calor. La vista va en metros y sigue a la cámara. */
-  dibujar(cam: Camara, calor: boolean) {
+  /**
+   * Difumina el tiempo parado de cada celda y devuelve su percentil 95, que es la escala del mapa de calor.
+   * Al comparar, las dos tiendas se pintan con la mayor de las dos escalas: si no, cada una se vería
+   * igual de roja aunque una tenga el triple de atascos.
+   */
+  escalaCalor(): number {
+    const sim = this.sim
+    const nav = this.nav
+    if (!sim || !nav) return 0
+    const v = Float32Array.from(sim.atascos)
+    difuminar(v, nav.ancho, nav.alto, 2)
+    difuminar(v, nav.ancho, nav.alto, 2)
+    this.calor = v
+    const valores = [...v].filter((x) => x > 0).sort((a, b) => a - b)
+    return valores.length ? valores[Math.floor(valores.length * 0.95)] || valores[valores.length - 1] : 0
+  }
+
+  /** Pinta clientes, personal, cajas y (si toca) el calor con la escala `tope`. La vista va en metros y sigue a la cámara. */
+  dibujar(cam: Camara, calor: boolean, tope = 0) {
     this.vista.position.set(cam.x, cam.y)
     this.vista.scale.set(cam.zoom)
     const g = this.g
@@ -93,7 +112,7 @@ export class Corrida {
     if (!sim || !nav) return
     const radio = Math.max(RADIO, RADIO_MIN_PX / cam.zoom)
     const celda = 0.5
-    if (calor) this.dibujarCalor(sim, nav)
+    if (calor) this.dibujarCalor(nav, tope || this.escalaCalor())
     // Mostradores y terminales de autopago, y los cajeros detrás de sus cajas.
     for (const p of nav.puestos) {
       for (const k of p.mueble) {
@@ -123,14 +142,12 @@ export class Corrida {
    * en un lienzo de una celda por píxel que se escala suavizado: salen manchas, no cuadros.
    * Las paradas para coger un producto no cuentan: si no, ardería cualquier estantería.
    */
-  private dibujarCalor(sim: Simulacion, nav: Navegacion) {
+  private dibujarCalor(nav: Navegacion, tope: number) {
     const { ancho, alto } = nav
-    const v = Float32Array.from(sim.atascos)
-    difuminar(v, ancho, alto, 2)
-    difuminar(v, ancho, alto, 2)
-    // Escala con el percentil 95 de lo que tiene algo: un solo punto muy caliente no apaga el resto.
-    const valores = [...v].filter((x) => x > 0).sort((a, b) => a - b)
-    const tope = valores.length ? valores[Math.floor(valores.length * 0.95)] || valores[valores.length - 1] : 1
+    if (!this.calor || this.calor.length !== ancho * alto) this.escalaCalor()
+    const v = this.calor!
+    // La escala es el percentil 95 (ver escalaCalor): un solo punto muy caliente no apaga el resto.
+    if (!(tope > 0)) tope = 1
 
     const lienzo = this.lienzoCalor
     if (lienzo.width !== ancho || lienzo.height !== alto) {

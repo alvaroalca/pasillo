@@ -1,3 +1,8 @@
+/* `hidden` tiene que ganar a cualquier `display` de una clase (la barra de estado es flex). */
+[hidden] {
+  display: none !important;
+}
+
 :root {
   --muro: #2e3438;
   --texto-suave: #5f6a72;
