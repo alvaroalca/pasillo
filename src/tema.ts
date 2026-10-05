@@ -1,0 +1,21 @@
+// Referencia: Mini Motorways (Dinosaur Polo Club). Vista cenital plana, fondo gris frío,
+// colores planos para lo que importa y gris carbón para la estructura.
+export const tema = {
+  exterior: 0xdce1e5,
+  suelo: 0xf5f7f8,
+  rejillaFina: 0x9aa5ae,
+  rejillaGruesa: 0x7c8892,
+  muro: 0x2e3438,
+  gondola: 0x454d53,
+  gondolaCara: 0x6e7880,
+  acento: 0x3a7bd5,
+  salida: 0x7a5cd0,
+  emergencia: 0xe8a317,
+  interior: 0x8a949c,
+  piezaVacia: 0xd5dbe0,
+  error: 0xe5484d,
+  bloqueado: 0x9aa5ae,
+  guia: 0xd6409f,
+  blanco: 0xffffff,
+  fuente: 'Nunito, sans-serif',
+}

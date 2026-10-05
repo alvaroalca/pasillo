@@ -1,0 +1,487 @@
+:root {
+  --muro: #2e3438;
+  --texto-suave: #5f6a72;
+  --suelo: #f5f7f8;
+  --borde: #d3d9de;
+  --acento: #3a7bd5;
+  --acento-oscuro: #2c64b3;
+  --salida: #7a5cd0;
+  --emergencia: #e8a317;
+  --error: #e5484d;
+  --bloqueado: #9aa5ae;
+  font-family: Nunito, sans-serif;
+  color: var(--muro);
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+}
+
+.barra,
+.herramientas,
+.panel,
+.estado {
+  position: fixed;
+  z-index: 1;
+  background: var(--suelo);
+  border-radius: 14px;
+  box-shadow: 0 2px 0 var(--borde), 0 8px 24px rgb(46 52 56 / 0.1);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+button {
+  font: inherit;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* Barra superior: menú, marca, deshacer y rehacer. */
+.barra {
+  /* Por encima de la barra de herramientas, para que el menú desplegable no quede debajo. */
+  z-index: 2;
+  top: 16px;
+  left: 16px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px;
+}
+
+.barra .marca {
+  margin: 0 10px 0 4px;
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--acento);
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  display: none;
+  min-width: 190px;
+  padding: 6px;
+  background: var(--suelo);
+  border-radius: 12px;
+  box-shadow: 0 2px 0 var(--borde), 0 8px 24px rgb(46 52 56 / 0.14);
+}
+
+.menu.abierto {
+  display: grid;
+}
+
+.opcion-menu {
+  padding: 8px 10px;
+  text-align: left;
+  background: transparent;
+  color: var(--muro);
+  font-weight: 600;
+}
+
+.opcion-menu:hover {
+  background: #e6eaed;
+}
+
+/* Botón de solo icono, en las barras y en las capas. */
+button.icono {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: transparent;
+  color: var(--muro);
+}
+
+button.icono:not(:disabled):hover {
+  background: #e6eaed;
+}
+
+button.icono.activa {
+  background: var(--acento);
+  color: #fff;
+}
+
+/* Barra de herramientas, vertical a la izquierda. */
+.herramientas {
+  top: 76px;
+  left: 16px;
+  display: grid;
+  gap: 2px;
+  padding: 6px;
+}
+
+/* Panel de propiedades y capas, a la derecha. */
+.panel {
+  top: 16px;
+  right: 16px;
+  width: 290px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 16px 18px 14px;
+}
+
+.panel .dato {
+  margin: 0 0 12px;
+  color: var(--texto-suave);
+}
+
+.panel .dato strong {
+  color: var(--muro);
+  font-weight: 800;
+}
+
+.panel ul {
+  margin: 0 0 12px;
+  padding-left: 18px;
+}
+
+.panel .subtitulo.separado {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--borde);
+}
+
+.capa {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.capa .nombre {
+  flex: 1;
+  font-weight: 600;
+}
+
+.panel button.icono.pequeno {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  color: var(--texto-suave);
+}
+
+.panel button.icono.pequeno.apagado {
+  color: var(--bloqueado);
+}
+
+.panel button.icono.pequeno.encendido {
+  color: var(--acento);
+}
+
+/* Barra de estado: qué hace la herramienta activa. */
+.estado {
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 18px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.estado .suave {
+  color: var(--texto-suave);
+  font-weight: 400;
+}
+
+.escala {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.escala label {
+  font-weight: 600;
+}
+
+.escala input {
+  font: inherit;
+  border-radius: 8px;
+}
+
+.escala input {
+  padding: 7px 10px;
+  border: 1px solid var(--borde);
+  background: #fff;
+  color: var(--muro);
+}
+
+.escala input:focus {
+  outline: 2px solid var(--acento);
+  outline-offset: -1px;
+}
+
+.panel button {
+  padding: 7px 12px;
+  font-weight: 800;
+}
+
+.primario {
+  background: var(--acento);
+  color: #fff;
+}
+
+.primario:hover {
+  background: var(--acento-oscuro);
+}
+
+.secundario {
+  width: 100%;
+  background: transparent;
+  color: var(--texto-suave);
+  box-shadow: inset 0 0 0 1px var(--borde);
+}
+
+.secundario:hover {
+  color: var(--muro);
+}
+
+.panel .subtitulo {
+  margin: 0 0 6px;
+  font-weight: 600;
+}
+
+.opciones {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.panel .opcion {
+  flex: 1;
+  padding: 6px 4px;
+  font-size: 13px;
+  background: #fff;
+  color: var(--muro);
+  box-shadow: inset 0 0 0 1px var(--borde);
+}
+
+.panel .opcion:not(.activa):hover {
+  box-shadow: inset 0 0 0 1px var(--texto-suave);
+}
+
+/* Pulsado: fondo de acento y un pequeño hundido. Los tipos de puerta cambian el color más abajo. */
+.panel .opcion.activa {
+  background: var(--acento);
+  color: #fff;
+  box-shadow: inset 0 2px 0 rgb(0 0 0 / 0.18);
+}
+
+.panel .opcion-entrada.activa {
+  background: var(--acento);
+}
+
+.panel .opcion-salida.activa {
+  background: var(--salida);
+}
+
+.panel .opcion-emergencia.activa {
+  background: var(--emergencia);
+}
+
+.campo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.campo label {
+  font-weight: 600;
+}
+
+.campo input {
+  width: 80px;
+  padding: 6px 8px;
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  font: inherit;
+  color: var(--muro);
+}
+
+.campo input:focus {
+  outline: 2px solid var(--acento);
+  outline-offset: -1px;
+}
+
+.panel .aviso {
+  margin: 0 0 10px;
+  color: var(--error);
+  font-weight: 600;
+}
+
+.fila-botones {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.areas {
+  display: grid;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+
+.area {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.area:hover {
+  background: #eceff2;
+}
+
+.area.activa {
+  background: #fff;
+  box-shadow: inset 0 0 0 2px var(--acento);
+}
+
+.muestra {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px rgb(46 52 56 / 0.15);
+}
+
+.area .nombre {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+}
+
+.area input.nombre {
+  padding: 2px 4px;
+  margin: -2px -4px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  font: inherit;
+  font-weight: 600;
+  color: var(--muro);
+}
+
+.area input.nombre:focus {
+  outline: 1px solid var(--borde);
+  background: #fff;
+}
+
+.area .datos {
+  flex: none;
+  font-size: 12px;
+  color: var(--texto-suave);
+}
+
+.panel .quitar {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  color: var(--texto-suave);
+  font-size: 16px;
+  line-height: 1;
+}
+
+.panel .quitar:hover {
+  background: #e6eaed;
+  color: var(--error);
+}
+
+.colores {
+  display: flex;
+  gap: 6px;
+  margin: 10px 0 12px;
+}
+
+.panel .color {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgb(46 52 56 / 0.15);
+}
+
+.panel .color.activa {
+  box-shadow: 0 0 0 2px var(--suelo), 0 0 0 4px var(--acento);
+}
+
+.panel .vacio {
+  margin: 0;
+  padding: 4px 6px;
+  color: var(--texto-suave);
+}
+
+
+.panel .secundario {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.panel .peligro:hover {
+  color: var(--error);
+  box-shadow: inset 0 0 0 1px var(--error);
+}
+
+.fila-botones .secundario {
+  padding: 7px 8px;
+  font-size: 13px;
+}
+
+.panel .atajos {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--texto-suave);
+}
+
+.panel .opcion-interior.activa {
+  background: var(--texto-suave);
+}
+
+/* Cuatro tipos de puerta: dos por fila. */
+.opciones.tipos-puerta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.campo select {
+  width: 150px;
+  padding: 6px 8px;
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  background: #fff;
+  font: inherit;
+  color: var(--muro);
+}
+
+.campo select:focus {
+  outline: 2px solid var(--acento);
+  outline-offset: -1px;
+}
