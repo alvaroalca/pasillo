@@ -17,3 +17,7 @@ Simulador de tiendas en el navegador. Dibujas la planta de tu tienda (paredes, p
 npm install
 npm run dev
 ```
+
+## Licencia
+
+MIT. Ver [LICENSE](LICENSE).
