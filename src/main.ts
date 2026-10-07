@@ -30,6 +30,7 @@ import { Interfaz } from './interfaz'
 import { ModoSimulacion } from './modo-simulacion'
 import { escalarPlan, planVacio, type Capa, type Plan } from './plan'
 import { Plano } from './plano'
+import { cargarHistorico, seccionesPorVentas } from './sim/historico'
 import { dibujarRejilla } from './rejilla'
 import { tema } from './tema'
 import './style.css'
@@ -91,6 +92,13 @@ const herramientas: Herramienta[] = [
   new HerramientaPincel(ctx, plano.pintura, pincel, true),
 ]
 const herramienta = (id: Herramienta['id']) => herramientas.find((h) => h.id === id)!
+// Los nombres de sección posibles son los del histórico: sin él, se escriben a mano.
+cargarHistorico().then((h) => {
+  if (!h) return
+  const catalogo = seccionesPorVentas(h)
+  for (const p of herramientas) if (p instanceof HerramientaPincel) p.catalogo = catalogo
+  pedirDibujo()
+})
 let activa = herramienta(plan.contorno ? 'seleccionar' : 'muro')
 let comparando = false
 const simulacion = new ModoSimulacion(plan, planA, {

@@ -26,6 +26,8 @@ import { tema } from './tema'
 const TAMANOS = [1, 2, 4, 8] // celdas por lado: 0,5 m (un tramo de una cara), 1, 2 y 4 m
 
 const css = (color: number) => `#${color.toString(16).padStart(6, '0')}`
+/** Mismo nombre de sección, como los casa la simulación: sin mayúsculas ni espacios de más. */
+const mismo = (x: string, y: string) => x.trim().toLowerCase() === y.trim().toLowerCase()
 
 /** Lo que comparten pincel y goma: la forma, el tamaño y el área con la que se pinta. */
 export interface EstadoPincel {
@@ -54,6 +56,12 @@ export class HerramientaPincel implements Herramienta {
   private ultimo: Vec | null = null
   private rect: { origen: Vec; fin: Vec } | null = null
   private datos = new Map<number, HTMLElement>()
+  /**
+   * Las secciones del histórico, de más a menos facturación: las únicas que la simulación sabe llenar
+   * de clientes, así que son los únicos nombres posibles. Null mientras no se ha leído (o si no se puede):
+   * entonces el nombre se escribe a mano.
+   */
+  catalogo: string[] | null = null
 
   private g = new Graphics()
   private etiquetas = new Container()
@@ -257,7 +265,9 @@ export class HerramientaPincel implements Herramienta {
   propiedades = {
     clave: () => {
       const a = this.area
-      return `${this.estado.forma}|${this.estado.tamano}|${a?.id}|${a?.color}|${this.ctx.plan.areas.length}`
+      // Con catálogo, cambiar un nombre cambia lo que les queda a las demás: se reconstruye.
+      const nombres = this.catalogo ? this.ctx.plan.areas.map((x) => x.nombre).join('|') : 'a mano'
+      return `${this.estado.forma}|${this.estado.tamano}|${a?.id}|${a?.color}|${this.ctx.plan.areas.length}|${nombres}`
     },
     construir: (raiz: HTMLElement) => this.construir(raiz),
     refrescar: () => this.refrescar(),
@@ -297,7 +307,12 @@ export class HerramientaPincel implements Herramienta {
     const ls = el('div', 'areas')
     for (const a of secciones) ls.append(this.fila(a))
     if (secciones.length === 0) ls.append(el('p', 'vacio', 'Aún no hay secciones.'))
-    raiz.append(ls, boton('+ Nueva sección', 'secundario', () => this.nuevaSeccion()))
+    const nueva = boton('+ Nueva sección', 'secundario', () => this.nuevaSeccion())
+    if (this.catalogo && this.libres().length === 0) {
+      nueva.disabled = true
+      nueva.title = 'Ya están todas las secciones con ventas en el histórico. Borra una para crear otra.'
+    }
+    raiz.append(ls, nueva)
 
     const sel = this.area
     if (sel?.tipo === 'seccion') {
@@ -327,7 +342,26 @@ export class HerramientaPincel implements Herramienta {
     muestra.style.backgroundColor = css(a.color)
     fila.append(muestra)
 
-    if (a.tipo === 'seccion') {
+    if (a.tipo === 'seccion' && this.catalogo) {
+      // Su nombre y los que no tiene ninguna otra. Uno de fuera del histórico (un archivo antiguo) se ve como tal.
+      const nombre = el('select', 'nombre')
+      nombre.id = `nombre-${a.id}`
+      nombre.ariaLabel = 'Nombre de la sección'
+      const opciones = this.catalogo.filter((n) => mismo(n, a.nombre) || this.libres().includes(n))
+      if (!opciones.some((n) => mismo(n, a.nombre))) opciones.unshift(a.nombre)
+      for (const n of opciones) {
+        const op = el('option', '', this.catalogo.some((c) => mismo(c, n)) ? n : `${n} (sin ventas)`)
+        op.value = n
+        op.selected = mismo(n, a.nombre)
+        nombre.append(op)
+      }
+      nombre.addEventListener('focus', () => this.elegir(a))
+      nombre.addEventListener('change', () => {
+        a.nombre = nombre.value
+        this.ctx.cambio()
+      })
+      fila.append(nombre)
+    } else if (a.tipo === 'seccion') {
       const nombre = el('input', 'nombre')
       nombre.id = `nombre-${a.id}`
       nombre.value = a.nombre
@@ -363,10 +397,19 @@ export class HerramientaPincel implements Herramienta {
     this.ctx.cambio()
   }
 
+  /** Las secciones del catálogo que aún no tiene la tienda, en su orden (de más a menos facturación). */
+  private libres(): string[] {
+    const usadas = this.ctx.plan.areas.filter((a) => a.tipo === 'seccion')
+    return (this.catalogo ?? []).filter((n) => !usadas.some((a) => mismo(a.nombre, n)))
+  }
+
+  /** Con catálogo, la nueva es la que más factura de las que faltan. */
   private nuevaSeccion() {
     const plan = this.ctx.plan
     const n = plan.areas.filter((a) => a.tipo === 'seccion').length
-    const a: Area = { id: nuevoId(), tipo: 'seccion', nombre: `Sección ${n + 1}`, color: COLORES_SECCION[n % COLORES_SECCION.length] }
+    const nombre = this.catalogo ? this.libres()[0] : `Sección ${n + 1}`
+    if (!nombre) return
+    const a: Area = { id: nuevoId(), tipo: 'seccion', nombre, color: COLORES_SECCION[n % COLORES_SECCION.length] }
     plan.areas.push(a)
     this.estado.area = a.id
     this.ctx.cambio()

@@ -381,7 +381,8 @@ button.icono.activa {
   font-weight: 600;
 }
 
-.area input.nombre {
+.area input.nombre,
+.area select.nombre {
   padding: 2px 4px;
   margin: -2px -4px;
   border: 0;
@@ -392,7 +393,12 @@ button.icono.activa {
   color: var(--muro);
 }
 
-.area input.nombre:focus {
+.area select.nombre {
+  cursor: pointer;
+}
+
+.area input.nombre:focus,
+.area select.nombre:focus {
   outline: 1px solid var(--borde);
   background: #fff;
 }

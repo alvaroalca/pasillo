@@ -29,20 +29,31 @@ const aMinutos = (hora: string) => {
   return h * 60 + m
 }
 
-export async function cargarHistorico(url = 'historico.json'): Promise<Historico | null> {
-  try {
-    const r = await fetch(url)
-    if (!r.ok) return null
-    return leerHistorico(await r.text())
-  } catch {
-    return null
-  }
+let cargado: Promise<Historico | null> | null = null
+
+/** Se lee una vez: lo piden el editor (los nombres de sección) y la simulación. */
+export function cargarHistorico(): Promise<Historico | null> {
+  cargado ??= fetch('historico.json')
+    .then(async (r) => (r.ok ? leerHistorico(await r.text()) : null))
+    .catch(() => null)
+    .then((h) => {
+      if (!h) cargado = null // se reintenta la próxima vez
+      return h
+    })
+  return cargado
 }
 
 export function leerHistorico(texto: string): Historico {
   const h = JSON.parse(texto)
   if (h?.formato !== 'planta-historico') throw new Error('El archivo no es un histórico de Pasillo.')
   return { secciones: h.secciones, apertura: aMinutos(h.apertura), cierre: aMinutos(h.cierre), dias: h.dias }
+}
+
+/** Las secciones del histórico, de la que más factura a la que menos: las únicas que tienen clientes. */
+export function seccionesPorVentas(h: Historico): string[] {
+  const ventas = h.secciones.map(() => 0)
+  for (const d of h.dias) for (const [, ls] of d.tickets) for (const [s, , c] of ls) ventas[s] += c
+  return h.secciones.map((nombre, s) => ({ nombre, v: ventas[s] })).sort((a, b) => b.v - a.v).map((x) => x.nombre)
 }
 
 export function eurosDia(d: Dia): number {
